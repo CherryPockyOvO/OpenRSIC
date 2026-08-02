@@ -38,7 +38,7 @@ IMAGE_EXTENSIONS = {".bmp", ".jpeg", ".jpg", ".png", ".tif", ".tiff", ".webp"}
 TRAIN_PROFILES = {
     "rsic_fp": {
         "model_variant": MODEL_VARIANT_RSIC,
-        "lmbda": 0.0932,
+        "lmbda": 0.0483,
         "l1_weight": 0.0,
         "epochs": 100,
         "batch_size": 32,
@@ -52,7 +52,7 @@ TRAIN_PROFILES = {
     },
     "rsic_qat8": {
         "model_variant": MODEL_VARIANT_RSIC,
-        "lmbda": 0.0932,
+        "lmbda": 0.0483,
         "l1_weight": 0.0,
         "epochs": 30,
         "batch_size": 32,
