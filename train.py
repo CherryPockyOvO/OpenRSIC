@@ -38,7 +38,8 @@ IMAGE_EXTENSIONS = {".bmp", ".jpeg", ".jpg", ".png", ".tif", ".tiff", ".webp"}
 TRAIN_PROFILES = {
     "rsic_fp": {
         "model_variant": MODEL_VARIANT_RSIC,
-        "lmbda": 0.0483,
+        "lmbda": 0.0067,
+        "target_bpp": 0.50,
         "l1_weight": 0.0,
         "epochs": 100,
         "batch_size": 32,
@@ -52,7 +53,8 @@ TRAIN_PROFILES = {
     },
     "rsic_qat8": {
         "model_variant": MODEL_VARIANT_RSIC,
-        "lmbda": 0.0483,
+        "lmbda": 0.0067,
+        "target_bpp": 0.50,
         "l1_weight": 0.0,
         "epochs": 30,
         "batch_size": 32,
@@ -196,17 +198,19 @@ def psnr_from_mse(mse: float) -> float:
 
 
 class RateDistortionLoss(nn.Module):
-    """OpenRSIC Rate-Distortion Loss Function (Matches CompressAI official 255^2 * lmbda * MSE + BPP)."""
+    """OpenRSIC Rate-Distortion Loss Function with Strict Target BPP Ceiling Penalty."""
 
     def __init__(
         self,
         lmbda: float = 0.0067,
-        l1_weight: float = 0.05,
+        target_bpp: float | None = 0.50,
+        l1_weight: float = 0.0,
         latent_range_weight: float = 0.01,
         z_range_weight: float = 0.01,
     ) -> None:
         super().__init__()
         self.lmbda = float(lmbda)
+        self.target_bpp = float(target_bpp) if target_bpp is not None else None
         self.l1_weight = float(l1_weight)
         self.latent_range_weight = float(latent_range_weight)
         self.z_range_weight = float(z_range_weight)
@@ -222,6 +226,10 @@ class RateDistortionLoss(nn.Module):
 
         distortion = 255.0**2 * (mse + self.l1_weight * l1)
         loss = self.lmbda * distortion + bpp
+
+        # Strict Target BPP Ceiling Penalty (severely penalizes any batch exceeding target_bpp)
+        if self.target_bpp is not None and bpp > self.target_bpp:
+            loss = loss + 10.0 * (bpp - self.target_bpp) ** 2
 
         # QAT Soft Range Penalties
         if self.latent_range_weight > 0 and "y" in output:
@@ -465,6 +473,7 @@ def main() -> None:
     base_model = get_model(decoder_type=args.decoder_type, qat=qat).to(device)
     criterion = RateDistortionLoss(
         lmbda=getattr(args, "lmbda", 0.0067),
+        target_bpp=getattr(args, "target_bpp", 0.50),
         latent_range_weight=getattr(args, "latent_range_weight", 0.0),
         z_range_weight=getattr(args, "z_range_weight", 0.0),
     ).to(device)
