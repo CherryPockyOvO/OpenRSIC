@@ -54,10 +54,10 @@ def load_remote_sensing_image(path: str | Path) -> Image.Image:
 
     return Image.fromarray(arr.astype(np.uint8))
 
-def read_remote_sensing_tif(path: str | Path) -> tuple[torch.Tensor, np.dtype, float, float]:
+def read_remote_sensing_tif(path: str | Path) -> tuple[torch.Tensor, np.dtype, float, float, int]:
     """Read a remote sensing TIF image into a 32-bit float PyTorch Tensor [3, H, W] in [0, 1].
 
-    Preserves metadata (original dtype, min_val, max_val) to allow exact native bit-depth reconstruction later.
+    Preserves metadata (original dtype, min_val, max_val, orig_channels) to allow exact native bit-depth reconstruction later.
     """
     path_str = str(path)
     try:
@@ -74,6 +74,7 @@ def read_remote_sensing_tif(path: str | Path) -> tuple[torch.Tensor, np.dtype, f
         arr = np.array(img)
 
     orig_dtype = arr.dtype
+    orig_channels = 1 if arr.ndim == 2 or (arr.ndim == 3 and arr.shape[2] == 1) else 3
     min_val = float(arr.min())
     max_val = float(arr.max())
     arr_f32 = arr.astype(np.float32)
@@ -94,7 +95,7 @@ def read_remote_sensing_tif(path: str | Path) -> tuple[torch.Tensor, np.dtype, f
             norm = norm[:, :, :3]
 
     tensor = torch.from_numpy(norm).permute(2, 0, 1)
-    return tensor, orig_dtype, min_val, max_val
+    return tensor, orig_dtype, min_val, max_val, orig_channels
 
 
 def tensor_to_remote_sensing_tif(
@@ -103,6 +104,7 @@ def tensor_to_remote_sensing_tif(
     min_val: float,
     max_val: float,
     save_path: str | Path,
+    orig_channels: int = 1,
 ) -> np.ndarray:
     """Restore a 32-bit float PyTorch Tensor [3, H, W] back to its native bit-depth (uint8, uint16, float32)
 
@@ -117,6 +119,9 @@ def tensor_to_remote_sensing_tif(
         out = (arr_f32 * 65535.0).round().astype(np.uint16)
     else:
         out = (arr_f32 * (max_val - min_val) + min_val).astype(orig_dtype)
+
+    if orig_channels == 1 and out.ndim == 3:
+        out = out[:, :, 0]
 
     save_str = str(save_path)
     try:
