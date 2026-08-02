@@ -39,11 +39,11 @@ TRAIN_PROFILES = {
     "rsic_fp": {
         "model_variant": MODEL_VARIANT_RSIC,
         "lmbda": 0.0932,
-        "l1_weight": 0.05,
+        "l1_weight": 0.0,
         "epochs": 100,
         "batch_size": 32,
         "crop_size": 512,
-        "lr": 1e-4,
+        "lr": 1.5e-4,
         "enable_latent_fake_quant": False,
         "enable_z_fake_quant": False,
         "enable_scale_fake_quant": False,
@@ -53,7 +53,7 @@ TRAIN_PROFILES = {
     "rsic_qat8": {
         "model_variant": MODEL_VARIANT_RSIC,
         "lmbda": 0.0932,
-        "l1_weight": 0.05,
+        "l1_weight": 0.0,
         "epochs": 30,
         "batch_size": 32,
         "crop_size": 512,
