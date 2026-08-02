@@ -15,8 +15,8 @@ python train.py \
   --quality-profile rsic_qat8 \
   --decoder-type swin \
   --init-checkpoint checkpoints_fp/best.pt \
-  --train-dir datasets/train \
-  --val-dir datasets/val \
+  --train-dir ../datasets/train \
+  --val-dir ../datasets/val \
   --checkpoint-dir checkpoints_qat8 \
   --batch-size 32 \
   --num-workers 8 \

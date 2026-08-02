@@ -14,8 +14,8 @@ fi
 python train.py \
   --quality-profile rsic_fp \
   --decoder-type swin \
-  --train-dir datasets/train \
-  --val-dir datasets/val \
+  --train-dir ../datasets/train \
+  --val-dir ../datasets/val \
   --checkpoint-dir checkpoints_fp \
   --batch-size 32 \
   --num-workers 8 \
