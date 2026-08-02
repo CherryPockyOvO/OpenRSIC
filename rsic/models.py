@@ -405,20 +405,21 @@ class GaussianConditionalEntropy(nn.Module):
         scales_y: Tensor,
         means_y: Tensor | None = None,
     ) -> Tensor:
-        step = self._step_like(y_hat)
-        means = self._means_like(y_hat, means_y)
-        scales = scales_y.to(device=y_hat.device, dtype=y_hat.dtype).clamp(
+        step = self._step_like(y_hat).float()
+        means = self._means_like(y_hat, means_y).float()
+        scales = scales_y.to(device=y_hat.device, dtype=torch.float32).clamp(
             self.scale_min,
             self.scale_max,
         )
-        centered = y_hat - means
+        centered = y_hat.float() - means
         upper = self._standardized_cumulative((centered + 0.5 * step) / scales)
         lower = self._standardized_cumulative((centered - 0.5 * step) / scales)
-        return (upper - lower).clamp_min(self.likelihood_bound)
+        return (upper - lower).clamp(self.likelihood_bound, 1.0)
 
     @staticmethod
     def _standardized_cumulative(inputs: Tensor) -> Tensor:
-        return 0.5 * torch.erfc(-inputs / (2.0**0.5))
+        inputs_f32 = inputs.float()
+        return 0.5 * torch.erfc(-inputs_f32 / 1.4142135623730951)
 
     def _step_like(self, tensor: Tensor) -> Tensor:
         return self.quant_step.to(device=tensor.device, dtype=tensor.dtype)

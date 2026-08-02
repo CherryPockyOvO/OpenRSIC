@@ -180,18 +180,19 @@ class NanoEntropyBottleneck(nn.Module):
         return -torch.log2(likelihoods.clamp_min(self.likelihood_bound)).sum()
 
     def _likelihood(self, y_hat: Tensor) -> Tensor:
-        step = self._step_like(y_hat)
-        medians = self._channel_param(self.medians, y_hat)
-        scales = torch.exp(self._channel_param(self.log_scales, y_hat)).clamp_min(1e-3)
+        step = self._step_like(y_hat).float()
+        medians = self._channel_param(self.medians, y_hat).float()
+        scales = torch.exp(self._channel_param(self.log_scales, y_hat)).float().clamp_min(1e-3)
 
-        centered = y_hat - medians
+        centered = y_hat.float() - medians
         upper = self._standardized_cumulative((centered + 0.5 * step) / scales)
         lower = self._standardized_cumulative((centered - 0.5 * step) / scales)
-        return (upper - lower).clamp_min(self.likelihood_bound)
+        return (upper - lower).clamp(self.likelihood_bound, 1.0)
 
     @staticmethod
     def _standardized_cumulative(inputs: Tensor) -> Tensor:
-        return 0.5 * torch.erfc(-inputs / math.sqrt(2.0))
+        inputs_f32 = inputs.float()
+        return 0.5 * torch.erfc(-inputs_f32 / 1.4142135623730951)
 
     def _step_like(self, tensor: Tensor) -> Tensor:
         return self.quant_step.to(device=tensor.device, dtype=tensor.dtype)

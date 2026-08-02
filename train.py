@@ -184,9 +184,10 @@ def make_eval_transform(crop_size: int) -> Compose:
 
 
 def compute_bpp(likelihoods: dict[str, torch.Tensor], num_pixels: int) -> torch.Tensor:
-    bits = torch.zeros((), device=next(iter(likelihoods.values())).device)
+    bits = torch.zeros((), device=next(iter(likelihoods.values())).device, dtype=torch.float32)
     for likelihood in likelihoods.values():
-        bits = bits + torch.sum(-torch.log2(likelihood.clamp_min(1e-9)))
+        lh_f32 = likelihood.float().clamp(1e-9, 1.0)
+        bits = bits + torch.sum(-torch.log2(lh_f32))
     return bits / float(num_pixels)
 
 
