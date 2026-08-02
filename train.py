@@ -38,8 +38,8 @@ IMAGE_EXTENSIONS = {".bmp", ".jpeg", ".jpg", ".png", ".tif", ".tiff", ".webp"}
 TRAIN_PROFILES = {
     "rsic_fp": {
         "model_variant": MODEL_VARIANT_RSIC,
-        "lmbda": 0.0483,
-        "max_bpp": 1.50,
+        "lmbda": 0.0067,
+        "max_bpp": 0.50,
         "l1_weight": 0.0,
         "epochs": 100,
         "batch_size": 32,
@@ -53,8 +53,8 @@ TRAIN_PROFILES = {
     },
     "rsic_qat8": {
         "model_variant": MODEL_VARIANT_RSIC,
-        "lmbda": 0.0483,
-        "max_bpp": 1.50,
+        "lmbda": 0.0067,
+        "max_bpp": 0.50,
         "l1_weight": 0.0,
         "epochs": 30,
         "batch_size": 32,
@@ -470,8 +470,8 @@ def main() -> None:
     )
     base_model = get_model(decoder_type=args.decoder_type, qat=qat).to(device)
     criterion = RateDistortionLoss(
-        lmbda=getattr(args, "lmbda", 0.0483),
-        max_bpp=getattr(args, "max_bpp", 1.50),
+        lmbda=getattr(args, "lmbda", 0.0067),
+        max_bpp=getattr(args, "max_bpp", 0.50),
         latent_range_weight=getattr(args, "latent_range_weight", 0.0),
         z_range_weight=getattr(args, "z_range_weight", 0.0),
     ).to(device)
