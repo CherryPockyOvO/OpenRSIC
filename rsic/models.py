@@ -9,11 +9,12 @@ import torch.nn.functional as F
 from torch import Tensor
 
 from .entropy import EntropyPayload, NanoEntropyBottleneck
-from .layers import ConvNormAct, conv, deconv, init_module, make_activation
+from .layers import conv, deconv, init_module, make_activation
 
 
-MODEL_VARIANT_HYPER_MS_Q_NANO = "nano_hyper_ms_q_nano"
-MODEL_VARIANT_HYPER_MS_Q = MODEL_VARIANT_HYPER_MS_Q_NANO
+MODEL_VARIANT_RSIC = "rsic"
+MODEL_VARIANT_HYPER_MS_Q_NANO = MODEL_VARIANT_RSIC
+MODEL_VARIANT_HYPER_MS_Q = MODEL_VARIANT_RSIC
 
 
 @dataclass(frozen=True)
@@ -25,7 +26,7 @@ class ModelConfig:
     decoder_res_blocks: int
     refinement_blocks: int
     name: str
-    model_variant: str = MODEL_VARIANT_HYPER_MS_Q_NANO
+    model_variant: str = MODEL_VARIANT_RSIC
     model_type: str = "mean_scale_hyperprior"
     encoder_type: str = "residual_quant_friendly_signed"
     activation: str = "relu6"
@@ -39,7 +40,7 @@ class ModelConfig:
 
 
 MODEL_CONFIGS: dict[str, ModelConfig] = {
-    MODEL_VARIANT_HYPER_MS_Q_NANO: ModelConfig(
+    MODEL_VARIANT_RSIC: ModelConfig(
         N=160,
         M=256,
         Z=128,
@@ -47,8 +48,8 @@ MODEL_CONFIGS: dict[str, ModelConfig] = {
         decoder_channels=160,
         decoder_res_blocks=1,
         refinement_blocks=1,
-        name=MODEL_VARIANT_HYPER_MS_Q_NANO,
-        model_variant=MODEL_VARIANT_HYPER_MS_Q_NANO,
+        name=MODEL_VARIANT_RSIC,
+        model_variant=MODEL_VARIANT_RSIC,
         model_type="mean_scale_hyperprior",
         encoder_type="residual_quant_friendly_signed",
         activation="relu6",
@@ -60,9 +61,8 @@ MODEL_CONFIGS: dict[str, ModelConfig] = {
         scale_max=20.0,
     ),
 }
-MODEL_CONFIGS[MODEL_VARIANT_HYPER_MS_Q] = MODEL_CONFIGS[MODEL_VARIANT_HYPER_MS_Q_NANO]
 
-MODEL_CONFIG = MODEL_CONFIGS[MODEL_VARIANT_HYPER_MS_Q_NANO]
+MODEL_CONFIG = MODEL_CONFIGS[MODEL_VARIANT_RSIC]
 
 
 def normalize_model_variant(model_variant: str | None = None) -> str:
@@ -146,22 +146,6 @@ class QATSettings:
     enable_scale_fake_quant: bool = False
     scale_fake_quant_bits: int = 8
     scale_fake_quant_clip: float = 8.0
-
-
-class Encoder(nn.Module):
-    """RK3588-friendly analysis transform g_a: image x -> latent y."""
-
-    def __init__(self, N: int = 128, M: int = 128, activation: str = "relu") -> None:
-        super().__init__()
-        self.net = nn.Sequential(
-            ConvNormAct(3, N, activation=activation),
-            ConvNormAct(N, N, activation=activation),
-            ConvNormAct(N, N, activation=activation),
-            conv(N, M),
-        )
-
-    def forward(self, x: Tensor) -> Tensor:
-        return self.net(x)
 
 
 class ConvAct(nn.Sequential):
@@ -807,14 +791,14 @@ def build_decoder(
     raise ValueError(f"unknown decoder_type={decoder_type!r}")
 
 
-class NanoHyperMeanScaleQ(nn.Module):
-    """Nano/mini mean-scale hyperprior codec prepared for RKNN mixed precision."""
+class RSIC(nn.Module):
+    """OpenRSIC Mean-Scale Hyperprior Neural Network Codec."""
 
     supports_cnz_v4 = False
 
     def __init__(
         self,
-        model_variant: str = MODEL_VARIANT_HYPER_MS_Q_NANO,
+        model_variant: str = MODEL_VARIANT_RSIC,
         activation: str | None = None,
         decoder_activation: str = "leaky_relu",
         clamp_decoder_output: bool = True,
@@ -891,6 +875,8 @@ class NanoHyperMeanScaleQ(nn.Module):
         init_module(self.hyper_encoder)
         init_module(self.hyper_decoder)
         init_module(self.decoder)
+
+
 
     @property
     def g_a(self) -> QuantFriendlyResidualEncoder:
@@ -1016,6 +1002,9 @@ class NanoHyperMeanScaleQ(nn.Module):
         )
 
 
+NanoHyperMeanScaleQ = RSIC
+
+
 def get_model(
     model_variant: str | None = None,
     activation: str | None = None,
@@ -1025,13 +1014,11 @@ def get_model(
     qat: QATSettings | None = None,
 ) -> nn.Module:
     variant = normalize_model_variant(model_variant)
-    if variant in {MODEL_VARIANT_HYPER_MS_Q, MODEL_VARIANT_HYPER_MS_Q_NANO}:
-        return NanoHyperMeanScaleQ(
-            model_variant=variant,
-            activation=activation,
-            decoder_activation=decoder_activation,
-            clamp_decoder_output=clamp_decoder_output,
-            decoder_type=decoder_type,
-            qat=qat,
-        )
-    raise AssertionError(f"unhandled model_variant={variant}")
+    return RSIC(
+        model_variant=variant,
+        activation=activation,
+        decoder_activation=decoder_activation,
+        clamp_decoder_output=clamp_decoder_output,
+        decoder_type=decoder_type,
+        qat=qat,
+    )

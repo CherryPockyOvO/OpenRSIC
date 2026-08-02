@@ -1,13 +1,14 @@
 from .models import (
-    Cheng2020AttentionDecoder,
-    ConvAct,
-    Decoder,
-    DownsampleResidualBlock,
-    Encoder,
     MODEL_CONFIG,
     MODEL_CONFIGS,
     MODEL_VARIANT_HYPER_MS_Q,
     MODEL_VARIANT_HYPER_MS_Q_NANO,
+    MODEL_VARIANT_RSIC,
+    RSIC,
+    Cheng2020AttentionDecoder,
+    ConvAct,
+    Decoder,
+    DownsampleResidualBlock,
     ModelConfig,
     NanoHyperMeanScaleQ,
     QATSettings,
@@ -35,11 +36,12 @@ from .utils import (
 )
 
 __all__ = [
+    "RSIC",
+    "MODEL_VARIANT_RSIC",
     "Cheng2020AttentionDecoder",
     "ConvAct",
     "Decoder",
     "DownsampleResidualBlock",
-    "Encoder",
     "MODEL_CONFIG",
     "MODEL_CONFIGS",
     "MODEL_VARIANT_HYPER_MS_Q",
