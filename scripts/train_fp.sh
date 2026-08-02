@@ -6,7 +6,7 @@ set -e
 # ==============================================================================
 
 python train.py \
-  --quality-profile hyper_ms_nano_fp \
+  --quality-profile rsic_fp \
   --decoder-type swin \
   --train-dir data/train \
   --val-dir data/val \

@@ -36,7 +36,7 @@ from rsic.utils import load_remote_sensing_image
 IMAGE_EXTENSIONS = {".bmp", ".jpeg", ".jpg", ".png", ".tif", ".tiff", ".webp"}
 
 TRAIN_PROFILES = {
-    "hyper_ms_nano_fp": {
+    "rsic_fp": {
         "model_variant": MODEL_VARIANT_RSIC,
         "lmbda": 0.06,
         "rate_weight": 0.35,
@@ -51,7 +51,7 @@ TRAIN_PROFILES = {
         "latent_range_weight": 0.0,
         "z_range_weight": 0.0,
     },
-    "hyper_ms_nano_qat8": {
+    "rsic_qat8": {
         "model_variant": MODEL_VARIANT_RSIC,
         "lmbda": 0.06,
         "rate_weight": 0.35,
@@ -404,7 +404,7 @@ def evaluate(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="OpenRSIC PyTorch Training Pipeline.")
-    parser.add_argument("--quality-profile", choices=list(TRAIN_PROFILES.keys()), default="hyper_ms_nano_fp")
+    parser.add_argument("--quality-profile", choices=list(TRAIN_PROFILES.keys()), default="rsic_fp")
     parser.add_argument("--decoder-type", choices=["standard", "cheng2020_attention", "swin"], default="swin")
     parser.add_argument("--train-dir", type=Path, required=True)
     parser.add_argument("--val-dir", type=Path, default=None)
@@ -413,7 +413,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--resume", type=Path, default=None)
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--batch-size", type=int, default=32)
-    parser.add_argument("--crop-size", type=int, default=384)
+    parser.add_argument("--crop-size", type=int, default=512)
     parser.add_argument("--num-workers", type=int, default=8)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--checkpoint-interval-steps", type=int, default=500)

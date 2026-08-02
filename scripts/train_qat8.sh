@@ -6,7 +6,7 @@ set -e
 # ==============================================================================
 
 python train.py \
-  --quality-profile hyper_ms_nano_qat8 \
+  --quality-profile rsic_qat8 \
   --decoder-type swin \
   --init-checkpoint checkpoints_fp/best.pt \
   --train-dir data/train \
