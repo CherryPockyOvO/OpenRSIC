@@ -49,48 +49,9 @@ def make_activation(name: str = "relu", inplace: bool = True) -> nn.Module:
     raise ValueError(f"Unsupported activation: {name}")
 
 
-class ConvNormAct(nn.Sequential):
-    """Conv2d + BatchNorm2d + activation replacement for CompressAI GDN blocks."""
-
-    def __init__(
-        self,
-        in_channels: int,
-        out_channels: int,
-        activation: str = "relu",
-        kernel_size: int = 5,
-        stride: int = 2,
-    ) -> None:
-        super().__init__(
-            conv(in_channels, out_channels, kernel_size=kernel_size, stride=stride),
-            nn.BatchNorm2d(out_channels),
-            make_activation(activation),
-        )
-
-
-class DeconvNormAct(nn.Sequential):
-    """ConvTranspose2d + BatchNorm2d + activation replacement for IGDN blocks."""
-
-    def __init__(
-        self,
-        in_channels: int,
-        out_channels: int,
-        activation: str = "relu",
-        kernel_size: int = 5,
-        stride: int = 2,
-    ) -> None:
-        super().__init__(
-            deconv(in_channels, out_channels, kernel_size=kernel_size, stride=stride),
-            nn.BatchNorm2d(out_channels),
-            make_activation(activation),
-        )
-
-
 def init_module(module: nn.Module) -> None:
     for layer in module.modules():
         if isinstance(layer, (nn.Conv2d, nn.ConvTranspose2d)):
             nn.init.kaiming_normal_(layer.weight, nonlinearity="relu")
             if layer.bias is not None:
                 nn.init.zeros_(layer.bias)
-        elif isinstance(layer, nn.BatchNorm2d):
-            nn.init.ones_(layer.weight)
-            nn.init.zeros_(layer.bias)
