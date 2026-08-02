@@ -1286,6 +1286,8 @@ def load_checkpoint(
         optimizer.load_state_dict(raw["optimizer"])
     if scheduler is not None and isinstance(raw, dict) and "scheduler" in raw:
         scheduler.load_state_dict(raw["scheduler"])
+    if scaler is not None and isinstance(raw, dict) and "scaler" in raw:
+        scaler.load_state_dict(raw["scaler"])
     if isinstance(raw, dict):
         return CheckpointState(
             epoch=int(raw.get("epoch", 0)),
@@ -1337,28 +1339,45 @@ def make_qat_settings(args: argparse.Namespace) -> QATSettings:
     )
 
 
+def save_train_config_json(args: argparse.Namespace, checkpoint_dir: Path, model: nn.Module) -> None:
+    """Save human-readable JSON configuration file for full training reproducibility."""
+    model = unwrap_model(model)
+    config_dict = {
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "model_variant": getattr(model, "model_variant", MODEL_VARIANT_RSIC),
+        "model_config": model.model_config_dict() if hasattr(model, "model_config_dict") else {},
+        "arguments": {k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()},
+    }
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+    json_path = checkpoint_dir / "train_config.json"
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(config_dict, f, indent=2, ensure_ascii=False)
+
+
 def save_checkpoint(
     path: Path,
     model: nn.Module,
     optimizer: torch.optim.Optimizer,
     scheduler: torch.optim.lr_scheduler.ReduceLROnPlateau | None,
+    scaler: torch.amp.GradScaler | None,
     epoch: int,
     global_step: int,
     args: argparse.Namespace,
     metrics: dict[str, float],
 ) -> None:
     model = unwrap_model(model)
-    model_variant = getattr(model, "model_variant", MODEL_VARIANT_HYPER_MS_Q_NANO)
+    model_variant = getattr(model, "model_variant", MODEL_VARIANT_RSIC)
     model_config = (
         model.model_config_dict()
         if hasattr(model, "model_config_dict")
-        else model_config_to_dict(MODEL_CONFIGS[MODEL_VARIANT_HYPER_MS_Q_NANO])
+        else model_config_to_dict(MODEL_CONFIGS[MODEL_VARIANT_RSIC])
     )
     payload = {
         "epoch": epoch,
         "global_step": global_step,
         "model_variant": model_variant,
         "model_config": model_config,
+        "decoder_type": getattr(args, "decoder_type", "swin"),
         "quality_profile": args.quality_profile,
         "lambda": args.lmbda,
         "rate_weight": args.rate_weight,
@@ -1396,6 +1415,8 @@ def save_checkpoint(
     }
     if scheduler is not None:
         payload["scheduler"] = scheduler.state_dict()
+    if scaler is not None:
+        payload["scaler"] = scaler.state_dict()
 
     path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(payload, path)
@@ -2229,7 +2250,7 @@ def main() -> None:
             if distributed.is_main:
                 print(f"initialized weights: {args.init_checkpoint} (source epoch {state.epoch})")
         elif args.resume is not None:
-            state = load_checkpoint(args.resume, base_model, optimizer, scheduler)
+            state = load_checkpoint(args.resume, base_model, optimizer, scheduler, scaler)
             start_epoch = state.epoch
             global_step = state.global_step or start_epoch * len(train_loader)
             set_quant_step(base_model, args.quant_step)
@@ -2237,6 +2258,7 @@ def main() -> None:
                 print(f"resumed: {args.resume} at epoch {start_epoch}, step {global_step}")
 
         if distributed.is_main:
+            save_train_config_json(args, args.checkpoint_dir, base_model)
             print_run_config(
                 args,
                 train_dataset,
@@ -2309,8 +2331,7 @@ def main() -> None:
             new_lr = get_current_lr(optimizer)
             metrics["lr"] = new_lr
 
-            checkpoint_index = max(1, math.ceil(step / args.checkpoint_interval_steps))
-            checkpoint_name = f"e{checkpoint_index}.pt"
+            checkpoint_name = f"iter_{step:07d}.pt"
             checkpoint_path = args.checkpoint_dir / checkpoint_name
             latest_path = args.checkpoint_dir / "latest.pt"
             best_path = args.checkpoint_dir / "best.pt"
@@ -2349,6 +2370,7 @@ def main() -> None:
                     base_model,
                     optimizer,
                     scheduler,
+                    scaler,
                     epoch,
                     step,
                     args,
@@ -2359,6 +2381,7 @@ def main() -> None:
                     base_model,
                     optimizer,
                     scheduler,
+                    scaler,
                     epoch,
                     step,
                     args,
@@ -2370,6 +2393,7 @@ def main() -> None:
                         base_model,
                         optimizer,
                         scheduler,
+                        scaler,
                         epoch,
                         step,
                         args,
