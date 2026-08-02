@@ -38,9 +38,8 @@ IMAGE_EXTENSIONS = {".bmp", ".jpeg", ".jpg", ".png", ".tif", ".tiff", ".webp"}
 TRAIN_PROFILES = {
     "rsic_fp": {
         "model_variant": MODEL_VARIANT_RSIC,
-        "lmbda": 0.06,
-        "rate_weight": 0.35,
-        "l1_weight": 0.08,
+        "lmbda": 0.0067,
+        "l1_weight": 0.05,
         "epochs": 100,
         "batch_size": 32,
         "crop_size": 512,
@@ -53,9 +52,8 @@ TRAIN_PROFILES = {
     },
     "rsic_qat8": {
         "model_variant": MODEL_VARIANT_RSIC,
-        "lmbda": 0.06,
-        "rate_weight": 0.35,
-        "l1_weight": 0.08,
+        "lmbda": 0.0067,
+        "l1_weight": 0.05,
         "epochs": 30,
         "batch_size": 32,
         "crop_size": 512,
@@ -198,21 +196,17 @@ def psnr_from_mse(mse: float) -> float:
 
 
 class RateDistortionLoss(nn.Module):
-    """OpenRSIC Rate-Distortion Loss Function with PSNR / BPP and Range Penalties."""
+    """OpenRSIC Rate-Distortion Loss Function (Matches CompressAI official 255^2 * lmbda * MSE + BPP)."""
 
     def __init__(
         self,
-        lmbda: float = 0.06,
-        rate_weight: float = 0.35,
-        ssim_weight: float = 0.05,
-        l1_weight: float = 0.08,
+        lmbda: float = 0.0067,
+        l1_weight: float = 0.05,
         latent_range_weight: float = 0.01,
         z_range_weight: float = 0.01,
     ) -> None:
         super().__init__()
         self.lmbda = float(lmbda)
-        self.rate_weight = float(rate_weight)
-        self.ssim_weight = float(ssim_weight)
         self.l1_weight = float(l1_weight)
         self.latent_range_weight = float(latent_range_weight)
         self.z_range_weight = float(z_range_weight)
@@ -226,8 +220,8 @@ class RateDistortionLoss(nn.Module):
         mse = F.mse_loss(x_hat, target)
         l1 = F.l1_loss(x_hat, target)
 
-        distortion = mse + self.l1_weight * l1
-        loss = self.lmbda * distortion + self.rate_weight * bpp
+        distortion = 255.0**2 * (mse + self.l1_weight * l1)
+        loss = self.lmbda * distortion + bpp
 
         # QAT Soft Range Penalties
         if self.latent_range_weight > 0 and "y" in output:
@@ -470,8 +464,7 @@ def main() -> None:
     )
     base_model = get_model(decoder_type=args.decoder_type, qat=qat).to(device)
     criterion = RateDistortionLoss(
-        lmbda=getattr(args, "lmbda", 0.06),
-        rate_weight=getattr(args, "rate_weight", 0.35),
+        lmbda=getattr(args, "lmbda", 0.0067),
         latent_range_weight=getattr(args, "latent_range_weight", 0.0),
         z_range_weight=getattr(args, "z_range_weight", 0.0),
     ).to(device)
