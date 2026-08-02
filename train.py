@@ -226,8 +226,8 @@ class RateDistortionLoss(nn.Module):
         loss = self.lmbda * distortion + bpp
 
         # Strict Max BPP Ceiling Penalty (ONLY penalizes if BPP exceeds 1.50 ceiling)
-        if self.max_bpp is not None and bpp > self.max_bpp:
-            loss = loss + 10.0 * (bpp - self.max_bpp) ** 2
+        if self.max_bpp is not None:
+            loss = loss + 10.0 * (torch.relu(bpp - self.max_bpp) ** 2)
 
         # QAT Soft Range Penalties
         if self.latent_range_weight > 0 and "y" in output:
