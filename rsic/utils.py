@@ -52,6 +52,8 @@ def load_remote_sensing_image(path: str | Path) -> Image.Image:
     elif max_val <= 1.0 and min_val >= 0.0:
         arr = arr * 255.0
 
+    return Image.fromarray(arr.astype(np.uint8))
+
 def read_remote_sensing_tif(path: str | Path) -> tuple[torch.Tensor, np.dtype, float, float]:
     """Read a remote sensing TIF image into a 32-bit float PyTorch Tensor [3, H, W] in [0, 1].
 

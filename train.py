@@ -121,7 +121,8 @@ class ImageFolderDataset(Dataset):
         self.root = Path(root)
         self.transform = transform
         self.paths = sorted(
-            p for p in self.root.rglob("*") if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS
+            p for p in self.root.rglob("*")
+            if p.is_file() and not p.name.startswith(".") and p.suffix.lower() in IMAGE_EXTENSIONS
         )
         if not self.paths:
             raise FileNotFoundError(f"No images found in {self.root}")
@@ -131,6 +132,8 @@ class ImageFolderDataset(Dataset):
 
     def __getitem__(self, index: int) -> torch.Tensor:
         image = load_remote_sensing_image(self.paths[index])
+        if image is None:
+            image = Image.new("RGB", (512, 512), (0, 0, 0))
         return self.transform(image)
 
 
