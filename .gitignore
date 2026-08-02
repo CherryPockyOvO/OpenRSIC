@@ -1,0 +1,41 @@
+# 排除權重與日誌
+checkpoints_*/
+*.pt
+*.log
+
+# 排除數據與圖片
+data/
+*.jpg
+*.png
+*.tif
+*.tiff
+*.mp4
+*.cnz
+*.bin
+*.hms
+*.npz
+*.npy
+*.onnx
+*.rknn
+entropy_params.json
+entropy_params2.json
+entropy_params_*.json
+*.decode_manifest.json
+out_cnz/
+roundtrip/
+dist/
+
+# 排除 Python 緩存
+__pycache__/
+.DS_Store
+*.pyc
+
+# 排除 C++ 構建產物
+cpp/build/
+
+# 本地產物
+artifacts/
+checkpoints*/
+out*/
+roundtrip*/
+
