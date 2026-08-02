@@ -12,8 +12,8 @@ from .entropy import EntropyPayload, NanoEntropyBottleneck
 from .layers import ConvNormAct, conv, deconv, init_module, make_activation
 
 
-MODEL_VARIANT_HYPER_MS_Q = "nano_hyper_ms_q"
 MODEL_VARIANT_HYPER_MS_Q_NANO = "nano_hyper_ms_q_nano"
+MODEL_VARIANT_HYPER_MS_Q = MODEL_VARIANT_HYPER_MS_Q_NANO
 
 
 @dataclass(frozen=True)
@@ -59,27 +59,8 @@ MODEL_CONFIGS: dict[str, ModelConfig] = {
         scale_min=1e-3,
         scale_max=20.0,
     ),
-    MODEL_VARIANT_HYPER_MS_Q: ModelConfig(
-        N=192,
-        M=320,
-        Z=160,
-        quant_step=0.35,
-        decoder_channels=192,
-        decoder_res_blocks=1,
-        refinement_blocks=1,
-        name=MODEL_VARIANT_HYPER_MS_Q,
-        model_variant=MODEL_VARIANT_HYPER_MS_Q,
-        model_type="mean_scale_hyperprior",
-        encoder_type="residual_quant_friendly_signed",
-        activation="relu6",
-        encoder_norm="none",
-        latent_clip=6.0,
-        signed_latent=True,
-        z_clip=6.0,
-        scale_min=1e-3,
-        scale_max=20.0,
-    ),
 }
+MODEL_CONFIGS[MODEL_VARIANT_HYPER_MS_Q] = MODEL_CONFIGS[MODEL_VARIANT_HYPER_MS_Q_NANO]
 
 MODEL_CONFIG = MODEL_CONFIGS[MODEL_VARIANT_HYPER_MS_Q_NANO]
 
