@@ -983,24 +983,56 @@ class RSIC(nn.Module):
         }
 
     @torch.no_grad()
-    def compress(self, x: Tensor) -> dict[str, object]:
-        del x
-        raise NotImplementedError(
-            "nano_hyper_ms_q training/export is implemented, but CNZ mean-scale "
-            "bitstream support requires a future CNZ5 format with z, means, and y streams."
-        )
+    def compress(self, x: Tensor) -> dict[str, Any]:
+        """Compress input image tensor [1, 3, H, W] into integer symbols & zlib byte streams."""
+        import zlib
+
+        y = self.encoder(x)
+        z = self.hyper_encoder(y)
+        z_sym = torch.round(z).to(torch.int16)
+        z_hat = z_sym.to(dtype=y.dtype)
+
+        scales_y, means_y = self.hyper_decoder(z_hat)
+        step = self.conditional_entropy_y.quant_step
+        y_sym = torch.round((y - means_y) / step).to(torch.int16)
+
+        z_bytes = zlib.compress(z_sym.cpu().numpy().tobytes(), level=6)
+        y_bytes = zlib.compress(y_sym.cpu().numpy().tobytes(), level=6)
+
+        return {
+            "z_bytes": z_bytes,
+            "y_bytes": y_bytes,
+            "z_shape": list(z.shape),
+            "y_shape": list(y.shape),
+            "quant_step": float(step.item()),
+        }
 
     @torch.no_grad()
-    def decompress(
-        self,
-        strings: bytes | list[bytes],
-        shape: tuple[int, int] | None = None,
-    ) -> dict[str, Tensor]:
-        del strings, shape
-        raise NotImplementedError(
-            "nano_hyper_ms_q cannot decode CNZ4 streams. Extend the bitstream to carry "
-            "z, y, means/scales, hyperprior shape, and model_variant before deployment."
-        )
+    def decompress(self, payload: dict[str, Any], device: torch.device | str | None = None) -> Tensor:
+        """Decompress zlib byte streams back to reconstructed image tensor [1, 3, H, W]."""
+        import zlib
+        import numpy as np
+
+        if device is None:
+            device = next(self.parameters()).device
+
+        z_shape = tuple(payload["z_shape"])
+        y_shape = tuple(payload["y_shape"])
+        quant_step = float(payload["quant_step"])
+
+        z_raw = zlib.decompress(payload["z_bytes"])
+        z_sym = torch.from_numpy(np.frombuffer(z_raw, dtype=np.int16).reshape(z_shape)).to(device=device, dtype=torch.float32)
+
+        scales_y, means_y = self.hyper_decoder(z_sym)
+
+        y_raw = zlib.decompress(payload["y_bytes"])
+        y_sym = torch.from_numpy(np.frombuffer(y_raw, dtype=np.int16).reshape(y_shape)).to(device=device, dtype=torch.float32)
+
+        y_hat = y_sym * quant_step + means_y
+        x_hat = self.decoder(y_hat)
+        if hasattr(self.decoder, "clamp_output") and self.decoder.clamp_output:
+            x_hat = torch.clamp(x_hat, 0.0, 1.0)
+        return x_hat
 
 
 NanoHyperMeanScaleQ = RSIC
