@@ -326,11 +326,12 @@ def train_one_epoch(
     epoch: int,
     global_step: int,
     checkpoint_interval_steps: int,
-    save_step_cb: Callable[[int, int, dict[str, float]], bool],
+    save_step_cb: Callable[[int, int, dict[str, float]], dict[str, float]],
     distributed: DistributedContext,
 ) -> tuple[dict[str, float], int, bool]:
     model.train()
     total_loss, total_mse, total_bpp, samples = 0.0, 0.0, 0.0, 0
+    last_val_metrics: dict[str, float] = {}
 
     pbar = tqdm(loader, desc=f"Epoch {epoch:03d}", disable=not distributed.is_main)
     for x in pbar:
@@ -358,7 +359,17 @@ def train_one_epoch(
 
         cur_psnr = psnr_from_mse(loss_dict["mse"].item())
         cur_lr = optimizer.param_groups[0]["lr"]
-        pbar.set_postfix({"loss": f"{loss.item():.4f}", "bpp": f"{loss_dict['bpp'].item():.3f}", "psnr": f"{cur_psnr:.2f}dB", "lr": f"{cur_lr:.1e}"})
+
+        postfix = {
+            "loss": f"{loss.item():.4f}",
+            "bpp": f"{loss_dict['bpp'].item():.3f}",
+            "psnr": f"{cur_psnr:.2f}dB",
+            "lr": f"{cur_lr:.1e}",
+        }
+        if "val_loss" in last_val_metrics:
+            postfix["val_loss"] = f"{last_val_metrics['val_loss']:.4f}"
+            postfix["val_psnr"] = f"{last_val_metrics['val_psnr']:.2f}dB"
+        pbar.set_postfix(postfix)
 
         if global_step % checkpoint_interval_steps == 0:
             avg_metrics = {
@@ -367,8 +378,7 @@ def train_one_epoch(
                 "psnr": psnr_from_mse(total_mse / max(1, samples)),
                 "bpp": total_bpp / max(1, samples),
             }
-            if not save_step_cb(epoch, global_step, avg_metrics):
-                return avg_metrics, global_step, True
+            last_val_metrics = save_step_cb(epoch, global_step, avg_metrics)
 
     avg_metrics = {
         "loss": total_loss / max(1, samples),
@@ -502,7 +512,7 @@ def main() -> None:
 
     best_val_loss = math.inf
 
-    def save_step_checkpoint(epoch: int, step: int, train_metrics: dict[str, float]) -> bool:
+    def save_step_checkpoint(epoch: int, step: int, train_metrics: dict[str, float]) -> dict[str, float]:
         nonlocal best_val_loss
         metrics = dict(train_metrics)
         if val_loader is not None:
@@ -523,7 +533,7 @@ def main() -> None:
             save_checkpoint(args.checkpoint_dir / "latest.pt", base_model, optimizer, scheduler, scaler, epoch, step, args, metrics)
             if improved:
                 save_checkpoint(args.checkpoint_dir / "best.pt", base_model, optimizer, scheduler, scaler, epoch, step, args, metrics)
-        return True
+        return metrics
 
     try:
         for epoch in range(start_epoch + 1, args.epochs + 1):
