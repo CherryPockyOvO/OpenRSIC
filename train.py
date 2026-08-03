@@ -357,7 +357,8 @@ def train_one_epoch(
         total_bpp += float(loss_dict["bpp"].item()) * bs
 
         cur_psnr = psnr_from_mse(loss_dict["mse"].item())
-        pbar.set_postfix({"loss": f"{loss.item():.4f}", "bpp": f"{loss_dict['bpp'].item():.3f}", "psnr": f"{cur_psnr:.2f}dB"})
+        cur_lr = optimizer.param_groups[0]["lr"]
+        pbar.set_postfix({"loss": f"{loss.item():.4f}", "bpp": f"{loss_dict['bpp'].item():.3f}", "psnr": f"{cur_psnr:.2f}dB", "lr": f"{cur_lr:.1e}"})
 
         if global_step % checkpoint_interval_steps == 0:
             avg_metrics = {
@@ -481,7 +482,7 @@ def main() -> None:
         model = DistributedDataParallel(base_model, device_ids=[distributed.local_rank])
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=3)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=1)
     scaler = torch.amp.GradScaler("cuda", enabled=amp_enabled)
 
     global_step, start_epoch = 0, 0
@@ -508,6 +509,8 @@ def main() -> None:
             val_metrics = evaluate(model, criterion, val_loader, device)
             metrics.update(val_metrics)
             scheduler.step(val_metrics["val_loss"])
+        else:
+            scheduler.step(metrics["loss"])
 
         improved = "val_loss" in metrics and metrics["val_loss"] < best_val_loss
         if improved:
