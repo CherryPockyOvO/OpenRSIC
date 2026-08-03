@@ -39,7 +39,7 @@ TRAIN_PROFILES = {
     "rsic_fp": {
         "model_variant": MODEL_VARIANT_RSIC,
         "lmbda": 0.1800,
-        "max_bpp": 1.50,
+        "max_bpp": 1.80,
         "l1_weight": 0.0,
         "epochs": 200,
         "batch_size": 32,
@@ -54,7 +54,7 @@ TRAIN_PROFILES = {
     "rsic_qat8": {
         "model_variant": MODEL_VARIANT_RSIC,
         "lmbda": 0.1800,
-        "max_bpp": 1.50,
+        "max_bpp": 1.80,
         "l1_weight": 0.0,
         "epochs": 30,
         "batch_size": 32,
@@ -225,9 +225,9 @@ class RateDistortionLoss(nn.Module):
         distortion = 255.0**2 * (mse + self.l1_weight * l1)
         loss = self.lmbda * distortion + bpp
 
-        # Strict Max BPP Ceiling Penalty (ONLY penalizes if BPP exceeds 1.50 ceiling)
+        # Smooth Max BPP Ceiling Penalty (ONLY penalizes if BPP exceeds ceiling)
         if self.max_bpp is not None:
-            loss = loss + 10.0 * (torch.relu(bpp - self.max_bpp) ** 2)
+            loss = loss + 2.0 * (torch.relu(bpp - self.max_bpp) ** 2)
 
         # QAT Soft Range Penalties
         if self.latent_range_weight > 0 and "y" in output:
@@ -482,7 +482,7 @@ def main() -> None:
     base_model = get_model(decoder_type=args.decoder_type, qat=qat).to(device)
     criterion = RateDistortionLoss(
         lmbda=getattr(args, "lmbda", 0.1800),
-        max_bpp=getattr(args, "max_bpp", 1.50),
+        max_bpp=getattr(args, "max_bpp", 1.80),
         latent_range_weight=getattr(args, "latent_range_weight", 0.0),
         z_range_weight=getattr(args, "z_range_weight", 0.0),
     ).to(device)
@@ -492,7 +492,7 @@ def main() -> None:
         model = DistributedDataParallel(base_model, device_ids=[distributed.local_rank])
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=1)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-6)
     scaler = torch.amp.GradScaler("cuda", enabled=amp_enabled)
 
     global_step, start_epoch = 0, 0
@@ -506,9 +506,9 @@ def main() -> None:
         if optimizer.param_groups[0]["lr"] < 1e-6:
             for param_group in optimizer.param_groups:
                 param_group["lr"] = args.lr
-            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=2)
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-6)
             if distributed.is_main:
-                print(f"🔄 Restored LR was exhausted ({optimizer.param_groups[0]['lr']:.1e}). Resetting LR to active rate: {args.lr:.1e}")
+                print(f"🔄 Restored LR was exhausted ({optimizer.param_groups[0]['lr']:.1e}). Resetting CosineAnnealingLR to active rate: {args.lr:.1e}")
         if distributed.is_main:
             print(f"Resumed training from {args.resume} (epoch {start_epoch}, step {global_step})")
 
@@ -524,9 +524,6 @@ def main() -> None:
         if val_loader is not None:
             val_metrics = evaluate(model, criterion, val_loader, device)
             metrics.update(val_metrics)
-            scheduler.step(val_metrics["val_loss"])
-        else:
-            scheduler.step(metrics["loss"])
 
         improved = "val_loss" in metrics and metrics["val_loss"] < best_val_loss
         if improved:
@@ -551,6 +548,7 @@ def main() -> None:
                 global_step=global_step, checkpoint_interval_steps=args.checkpoint_interval_steps,
                 save_step_cb=save_step_checkpoint, distributed=distributed,
             )
+            scheduler.step()
             if stop:
                 break
     finally:
