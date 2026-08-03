@@ -503,6 +503,12 @@ def main() -> None:
     elif args.resume:
         state = load_checkpoint(args.resume, base_model, optimizer, scheduler, scaler)
         start_epoch, global_step = state.epoch, state.global_step
+        if optimizer.param_groups[0]["lr"] < 1e-6:
+            for param_group in optimizer.param_groups:
+                param_group["lr"] = args.lr
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=2)
+            if distributed.is_main:
+                print(f"🔄 Restored LR was exhausted ({optimizer.param_groups[0]['lr']:.1e}). Resetting LR to active rate: {args.lr:.1e}")
         if distributed.is_main:
             print(f"Resumed training from {args.resume} (epoch {start_epoch}, step {global_step})")
 
