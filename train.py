@@ -41,7 +41,7 @@ TRAIN_PROFILES = {
         "lmbda": 0.1800,
         "max_bpp": 1.50,
         "l1_weight": 0.0,
-        "epochs": 100,
+        "epochs": 200,
         "batch_size": 32,
         "crop_size": 512,
         "lr": 1.5e-4,

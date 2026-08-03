@@ -18,5 +18,6 @@ python train.py \
   --val-dir ../datasets/val \
   --checkpoint-dir checkpoints_fp \
   --batch-size 32 \
+  --epochs 200 \
   --num-workers 8 \
   $RESUME_ARG
