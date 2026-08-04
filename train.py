@@ -551,10 +551,10 @@ def main() -> None:
     # CompressAI Official Optimizer Settings (Adam with lr=1e-4)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
-    # CompressAI Official MultiStepLR Scheduler (decay at 75% and 90% epochs)
+    # Smoother MultiStepLR Scheduler (gamma=0.3 to maintain active convergence without freezing at 1e-6)
     step1 = int(args.epochs * 0.75)
     step2 = int(args.epochs * 0.90)
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[step1, step2], gamma=0.1)
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[step1, step2], gamma=0.3)
 
     scaler = torch.amp.GradScaler("cuda", enabled=amp_enabled)
 
