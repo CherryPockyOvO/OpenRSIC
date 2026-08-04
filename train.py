@@ -566,6 +566,16 @@ def main() -> None:
     elif args.resume:
         state = load_checkpoint(args.resume, base_model, optimizer, scheduler, scaler)
         start_epoch, global_step = state.epoch, state.global_step
+        current_lr = optimizer.param_groups[0]["lr"]
+        if current_lr <= 2e-6:
+            target_lr = 4.5e-5
+            for param_group in optimizer.param_groups:
+                param_group["lr"] = target_lr
+            step1 = int(args.epochs * 0.75)
+            step2 = int(args.epochs * 0.90)
+            scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[step1, step2], gamma=0.3)
+            if distributed.is_main:
+                print(f"🔄 Restored LR was exhausted ({current_lr:.1e}). Automatically reset LR to active rate: {target_lr:.1e}")
         if distributed.is_main:
             print(f"Resumed training from {args.resume} (epoch {start_epoch}, step {global_step})")
 
