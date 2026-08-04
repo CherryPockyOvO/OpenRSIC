@@ -16,18 +16,24 @@ def load_remote_sensing_image(path: str | Path) -> Image.Image:
     3-channel, and 4-channel multispectral images. Normalizes into a standard 3-channel RGB PIL Image.
     """
     path_str = str(path)
+    arr = None
     try:
         img = Image.open(path_str)
         if img.mode in ("RGB", "L", "RGBA"):
             return img.convert("RGB")
         arr = np.array(img)
     except Exception:
+        arr = None
+
+    if arr is None:
         try:
             import cv2
 
             arr = cv2.imread(path_str, cv2.IMREAD_UNCHANGED)
             if arr is None:
                 raise ValueError(f"Failed to load image at: {path_str}")
+            if arr.ndim == 3 and arr.shape[2] == 3:
+                arr = cv2.cvtColor(arr, cv2.COLOR_BGR2RGB)
         except ImportError:
             raise ValueError(f"Cannot load image at: {path_str}. Install opencv-python for advanced TIFF formats.")
 
@@ -54,24 +60,32 @@ def load_remote_sensing_image(path: str | Path) -> Image.Image:
 
     return Image.fromarray(arr.astype(np.uint8))
 
+
 def read_remote_sensing_tif(path: str | Path) -> tuple[torch.Tensor, np.dtype, float, float, int]:
     """Read a remote sensing TIF image into a 32-bit float PyTorch Tensor [3, H, W] in [0, 1].
 
     Preserves metadata (original dtype, min_val, max_val, orig_channels) to allow exact native bit-depth reconstruction later.
     """
     path_str = str(path)
+    arr = None
     try:
+        img = Image.open(path_str)
+        if img.mode in ("RGB", "L", "RGBA"):
+            arr = np.array(img.convert("RGB"))
+        else:
+            arr = np.array(img)
+    except Exception:
+        arr = None
+
+    if arr is None:
         import cv2
 
         arr = cv2.imread(path_str, cv2.IMREAD_UNCHANGED)
         if arr is not None and arr.ndim == 3 and arr.shape[2] == 3:
             arr = cv2.cvtColor(arr, cv2.COLOR_BGR2RGB)
-    except Exception:
-        arr = None
 
     if arr is None:
-        img = Image.open(path_str)
-        arr = np.array(img)
+        raise FileNotFoundError(f"Could not load image at: {path_str}")
 
     orig_dtype = arr.dtype
     orig_channels = 1 if arr.ndim == 2 or (arr.ndim == 3 and arr.shape[2] == 1) else 3
@@ -124,13 +138,14 @@ def tensor_to_remote_sensing_tif(
         out = out[:, :, 0]
 
     save_str = str(save_path)
-    try:
-        import cv2
-
-        bgr_out = cv2.cvtColor(out, cv2.COLOR_RGB2BGR) if out.ndim == 3 and out.shape[2] == 3 else out
-        cv2.imwrite(save_str, bgr_out)
-    except Exception:
+    if out.ndim == 3 and out.shape[2] == 3:
         Image.fromarray(out.astype(np.uint8) if out.dtype != np.uint8 else out).save(save_str)
+    else:
+        try:
+            import cv2
+            cv2.imwrite(save_str, out)
+        except Exception:
+            Image.fromarray(out).save(save_str)
     return out
 
 
