@@ -81,16 +81,17 @@ def read_remote_sensing_tif(path: str | Path) -> tuple[torch.Tensor, np.dtype, f
         arr = None
 
     if arr is None:
-        import cv2
+        try:
+            import cv2
 
-        arr = cv2.imread(path_str, cv2.IMREAD_UNCHANGED)
-        if arr is not None:
-            used_cv2 = True
-            if arr.ndim == 3 and arr.shape[2] >= 3:
-                # Convert OpenCV BGR/BGRA to RGB/RGBA
-                arr[:, :, :3] = arr[:, :, [2, 1, 0]]
-    except Exception:
-        arr = None
+            arr = cv2.imread(path_str, cv2.IMREAD_UNCHANGED)
+            if arr is not None:
+                used_cv2 = True
+                if arr.ndim == 3 and arr.shape[2] >= 3:
+                    # Convert OpenCV BGR/BGRA to RGB/RGBA
+                    arr[:, :, :3] = arr[:, :, [2, 1, 0]]
+        except Exception:
+            arr = None
 
     if arr is None:
         raise FileNotFoundError(f"Could not load image at: {path_str}")
@@ -156,11 +157,8 @@ def tensor_to_remote_sensing_tif(
         out = out[:, :, 0]
 
     save_str = str(save_path)
-    if "uint8" in dtype_str:
-        Image.fromarray(out).save(save_str)
-    else:
-        try:
-            import cv2
+    try:
+        import cv2
 
         bgr_out = out.copy()
         if bgr_out.ndim == 3 and bgr_out.shape[2] >= 3:
