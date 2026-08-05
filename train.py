@@ -517,12 +517,20 @@ def main() -> None:
         sampler=train_sampler,
         num_workers=args.num_workers,
         pin_memory=True,
+        persistent_workers=(args.num_workers > 0),
     )
 
     val_loader = None
     if args.val_dir and args.val_dir.exists():
         val_dataset = ImageFolderDataset(args.val_dir, transform=make_eval_transform(args.crop_size))
-        val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
+        val_loader = DataLoader(
+            val_dataset,
+            batch_size=args.batch_size,
+            shuffle=False,
+            num_workers=args.num_workers,
+            pin_memory=True,
+            persistent_workers=(args.num_workers > 0),
+        )
 
     # QAT Settings & Model
     qat = QATSettings(

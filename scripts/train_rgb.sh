@@ -19,8 +19,8 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 torchrun --nproc_per_node=4 train.py \
   --train-dir ../datasets2/train \
   --val-dir ../datasets2/val \
   --checkpoint-dir checkpoints_fp \
-  --batch-size 32 \
+  --batch-size 64 \
   --epochs 1000 \
   --lr 1e-4 \
-  --num-workers 8 \
+  --num-workers 12 \
   $RESUME_ARG
