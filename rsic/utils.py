@@ -95,10 +95,16 @@ def read_remote_sensing_tif(path: str | Path) -> tuple[torch.Tensor, np.dtype, f
 
     if orig_dtype == np.uint8:
         norm = arr_f32 / 255.0
+    elif max_val <= 1.0 and min_val >= 0.0:
+        norm = arr_f32
+    elif max_val <= 255.0:
+        norm = arr_f32 / 255.0
     elif orig_dtype == np.uint16:
         norm = arr_f32 / 65535.0
+    elif max_val > min_val:
+        norm = (arr_f32 - min_val) / (max_val - min_val + 1e-7)
     else:
-        norm = (arr_f32 - min_val) / (max_val - min_val + 1e-7) if max_val > min_val else np.zeros_like(arr_f32)
+        norm = np.zeros_like(arr_f32)
 
     if norm.ndim == 2:
         norm = np.stack([norm] * 3, axis=-1)
@@ -129,6 +135,10 @@ def tensor_to_remote_sensing_tif(
 
     if "uint8" in dtype_str:
         out = (arr_f32 * 255.0).round().astype(np.uint8)
+    elif max_val <= 1.0 and min_val >= 0.0:
+        out = arr_f32.astype(orig_dtype)
+    elif max_val <= 255.0:
+        out = (arr_f32 * 255.0).astype(orig_dtype)
     elif "uint16" in dtype_str:
         out = (arr_f32 * 65535.0).round().astype(np.uint16)
     else:
