@@ -49,7 +49,33 @@ def setup_autodl_pub_coco() -> None:
             shutil.rmtree(nested_train)
         print("✅ Training dataset unzipped and ready!")
     else:
-        print(f"⚠️ train2017.zip not found in candidate public directories (/autodl-pub, /root/autodl-pub).")
+        print(f"⚠️ train2017.zip not found in candidate public directories.")
+
+    # Check for DIV2K HighResolution directory
+    div2k_roots = [
+        Path("/autodl-pub/DIV2K/HighResolution"),
+        Path("/root/autodl-pub/DIV2K/HighResolution"),
+        Path("/autodl-pub/DIV2K"),
+        Path("/root/autodl-pub/DIV2K"),
+    ]
+    div2k_found = False
+    for div2k_path in div2k_roots:
+        if div2k_path.exists():
+            print(f"\n📦 Found DIV2K public dataset at: {div2k_path}")
+            linked = 0
+            for img_file in div2k_path.rglob("*"):
+                if img_file.is_file() and img_file.suffix.lower() in {".png", ".jpg", ".jpeg"}:
+                    target_link = train_target / f"div2k_{img_file.name}"
+                    if not target_link.exists() and not target_link.is_symlink():
+                        try:
+                            target_link.symlink_to(img_file)
+                            linked += 1
+                        except Exception:
+                            pass
+            if linked > 0:
+                print(f"✅ Created {linked} symlinks from DIV2K into {train_target}!")
+                div2k_found = True
+                break
 
     if val_zip and val_zip.exists():
         print(f"\n📦 Found local public zip: {val_zip}")
@@ -65,9 +91,9 @@ def setup_autodl_pub_coco() -> None:
             shutil.rmtree(nested_val)
         print("✅ Validation dataset unzipped and ready!")
     else:
-        print(f"⚠️ val2017.zip not found in candidate public directories (/autodl-pub, /root/autodl-pub).")
+        print(f"⚠️ val2017.zip not found in candidate public directories.")
 
-    print("\n🎉 All AutoDL public COCO2017 datasets check finished under /root/autodl-tmp/datasets2!")
+    print("\n🎉 All AutoDL public datasets check finished under /root/autodl-tmp/datasets2!")
 
 
 if __name__ == "__main__":
