@@ -32,6 +32,7 @@ from rsic import (
     load_checkpoint,
 )
 from rsic.utils import (
+    calculate_color_and_reconstruction_metrics,
     crop_to_size,
     pad_to_multiple,
     read_remote_sensing_tif,
@@ -220,7 +221,7 @@ def evaluate_simulation(
     encode_ms: float,
     decode_ms: float,
 ) -> None:
-    """Calculate and display PSNR, MSE, SSIM quality metrics."""
+    """Calculate and display PSNR, MSE, SSIM, and color difference quality metrics."""
     raw_tensor, orig_dtype, min_val, max_val, orig_channels = read_remote_sensing_tif(input_tif)
     rec_tensor, _, _, _, _ = read_remote_sensing_tif(reconstructed_tif)
 
@@ -231,16 +232,40 @@ def evaluate_simulation(
     rec_arr = (rec_tensor.permute(1, 2, 0).numpy() * 255.0).astype(np.uint8)
     ssim_val = calculate_ssim(raw_arr, rec_arr)
 
+    color_metrics = calculate_color_and_reconstruction_metrics(
+        img_orig=raw_tensor,
+        img_recon=rec_tensor,
+        is_tif=True,
+        orig_dtype=str(orig_dtype),
+        min_val=min_val,
+        max_val=max_val,
+        orig_channels=orig_channels,
+    )
+
     print("\n" + "=" * 60)
     print(" 🚀 OpenRSIC Neural Compression Simulation Results")
     print("=" * 60)
     print(f"  📄 Input Image        : {input_tif}")
     print(f"  💾 Bitstream Output    : {reconstructed_tif.with_suffix('.rsic')}")
-    print(f"  🖼️  Reconstructed TIF  : {reconstructed_tif}")
+    print(f"  🖼️  Reconstructed TIF  : {reconstructed_tif} ({orig_channels} 通道)")
     print(f"  📊 Bitrate (BPP)      : {bpp:.4f} bpp")
     print(f"  📦 Compression Ratio  : {compression_ratio:.2f}x")
     print(f"  📈 PSNR               : {psnr_val:.2f} dB")
     print(f"  ✨ SSIM               : {ssim_val:.4f}")
+    if orig_channels == 1:
+        print("  --------------------------------------------------------")
+        print(f"  📏 MAE (Native Scale)  : {color_metrics.get('native_mae', 0.0):.6f}")
+        print(f"  📐 RMSE (Native Scale) : {color_metrics.get('native_rmse', 0.0):.6f}")
+        print(f"  💥 MaxAE (Peak Error)  : {color_metrics.get('max_abs_error', 0.0):.6f}")
+        print(f"  📊 Relative Error (MAPE): {color_metrics.get('relative_error_pct', 0.0):.4f} %")
+        print(f"  📡 SNR (Signal-Noise)  : {color_metrics.get('snr_db', 0.0):.2f} dB")
+    else:
+        print("  --------------------------------------------------------")
+        print(f"  🎨 CIEDE2000 色差 ΔE00 : {color_metrics.get('delta_e00_mean', 0.0):.4f} (Max: {color_metrics.get('delta_e00_max', 0.0):.4f})")
+        print(f"  🎨 CIE76 色差 ΔE76     : {color_metrics.get('delta_e76_mean', 0.0):.4f}")
+        print(f"  🔴 Red 通道 MAE (0-255): {color_metrics.get('r_mae', 0.0):.4f}")
+        print(f"  🟢 Green 通道 MAE      : {color_metrics.get('g_mae', 0.0):.4f}")
+        print(f"  🔵 Blue 通道 MAE       : {color_metrics.get('b_mae', 0.0):.4f}")
     print(f"  ⏱️  Encode Latency     : {encode_ms:.2f} ms")
     print(f"  ⏱️  Decode Latency     : {decode_ms:.2f} ms")
     print("=" * 60 + "\n")

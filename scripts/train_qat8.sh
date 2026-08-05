@@ -13,7 +13,7 @@ if [ -f "checkpoints_qat8/latest.pt" ]; then
     RESUME_ARG="--resume checkpoints_qat8/latest.pt"
 fi
 
-python train.py \
+CUDA_VISIBLE_DEVICES=2,3 torchrun --nproc_per_node=2 train.py \
   --quality-profile compressai_q8_qat8 \
   --decoder-type swin \
   --init-checkpoint checkpoints_fp/best.pt \

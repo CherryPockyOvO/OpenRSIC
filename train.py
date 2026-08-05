@@ -78,7 +78,7 @@ TRAIN_PROFILES = {
         "epochs": 200,
         "batch_size": 32,
         "crop_size": 512,
-        "lr": 1e-4,
+        "lr": 4e-5,
         "enable_latent_fake_quant": False,
         "enable_z_fake_quant": False,
         "enable_scale_fake_quant": False,
@@ -106,15 +106,15 @@ TRAIN_PROFILES = {
         "z_range_weight": 0.01,
     },
     # CompressAI Quality Levels 1 ~ 7 Profiles
-    "compressai_q7_fp": {"model_variant": MODEL_VARIANT_RSIC, "lmbda": COMPRESSAI_LAMBDAS[7], "max_bpp": None, "epochs": 200, "batch_size": 32, "crop_size": 512, "lr": 1e-4},
-    "compressai_q6_fp": {"model_variant": MODEL_VARIANT_RSIC, "lmbda": COMPRESSAI_LAMBDAS[6], "max_bpp": None, "epochs": 200, "batch_size": 32, "crop_size": 512, "lr": 1e-4},
-    "compressai_q5_fp": {"model_variant": MODEL_VARIANT_RSIC, "lmbda": COMPRESSAI_LAMBDAS[5], "max_bpp": None, "epochs": 200, "batch_size": 32, "crop_size": 512, "lr": 1e-4},
-    "compressai_q4_fp": {"model_variant": MODEL_VARIANT_RSIC, "lmbda": COMPRESSAI_LAMBDAS[4], "max_bpp": None, "epochs": 200, "batch_size": 32, "crop_size": 512, "lr": 1e-4},
-    "compressai_q3_fp": {"model_variant": MODEL_VARIANT_RSIC, "lmbda": COMPRESSAI_LAMBDAS[3], "max_bpp": None, "epochs": 200, "batch_size": 32, "crop_size": 512, "lr": 1e-4},
-    "compressai_q2_fp": {"model_variant": MODEL_VARIANT_RSIC, "lmbda": COMPRESSAI_LAMBDAS[2], "max_bpp": None, "epochs": 200, "batch_size": 32, "crop_size": 512, "lr": 1e-4},
-    "compressai_q1_fp": {"model_variant": MODEL_VARIANT_RSIC, "lmbda": COMPRESSAI_LAMBDAS[1], "max_bpp": None, "epochs": 200, "batch_size": 32, "crop_size": 512, "lr": 1e-4},
+    "compressai_q7_fp": {"model_variant": MODEL_VARIANT_RSIC, "lmbda": COMPRESSAI_LAMBDAS[7], "max_bpp": None, "epochs": 200, "batch_size": 32, "crop_size": 512, "lr": 4e-5},
+    "compressai_q6_fp": {"model_variant": MODEL_VARIANT_RSIC, "lmbda": COMPRESSAI_LAMBDAS[6], "max_bpp": None, "epochs": 200, "batch_size": 32, "crop_size": 512, "lr": 4e-5},
+    "compressai_q5_fp": {"model_variant": MODEL_VARIANT_RSIC, "lmbda": COMPRESSAI_LAMBDAS[5], "max_bpp": None, "epochs": 200, "batch_size": 32, "crop_size": 512, "lr": 4e-5},
+    "compressai_q4_fp": {"model_variant": MODEL_VARIANT_RSIC, "lmbda": COMPRESSAI_LAMBDAS[4], "max_bpp": None, "epochs": 200, "batch_size": 32, "crop_size": 512, "lr": 4e-5},
+    "compressai_q3_fp": {"model_variant": MODEL_VARIANT_RSIC, "lmbda": COMPRESSAI_LAMBDAS[3], "max_bpp": None, "epochs": 200, "batch_size": 32, "crop_size": 512, "lr": 4e-5},
+    "compressai_q2_fp": {"model_variant": MODEL_VARIANT_RSIC, "lmbda": COMPRESSAI_LAMBDAS[2], "max_bpp": None, "epochs": 200, "batch_size": 32, "crop_size": 512, "lr": 4e-5},
+    "compressai_q1_fp": {"model_variant": MODEL_VARIANT_RSIC, "lmbda": COMPRESSAI_LAMBDAS[1], "max_bpp": None, "epochs": 200, "batch_size": 32, "crop_size": 512, "lr": 4e-5},
     # Legacy Profiles Compatibility
-    "rsic_fp": {"model_variant": MODEL_VARIANT_RSIC, "lmbda": COMPRESSAI_LAMBDAS[8], "max_bpp": None, "epochs": 200, "batch_size": 32, "crop_size": 512, "lr": 1e-4},
+    "rsic_fp": {"model_variant": MODEL_VARIANT_RSIC, "lmbda": COMPRESSAI_LAMBDAS[8], "max_bpp": None, "epochs": 200, "batch_size": 32, "crop_size": 512, "lr": 4e-5},
     "rsic_qat8": {"model_variant": MODEL_VARIANT_RSIC, "lmbda": COMPRESSAI_LAMBDAS[8], "max_bpp": None, "epochs": 40, "batch_size": 32, "crop_size": 512, "lr": 1e-5, "enable_latent_fake_quant": True, "latent_fake_quant_bits": 8, "enable_z_fake_quant": True, "z_fake_quant_bits": 8, "enable_scale_fake_quant": True, "scale_fake_quant_bits": 8, "latent_range_weight": 0.01, "z_range_weight": 0.01},
 }
 
@@ -487,7 +487,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--crop-size", type=int, default=512)
     parser.add_argument("--num-workers", type=int, default=8)
-    parser.add_argument("--lr", type=float, default=1e-4)
+    parser.add_argument("--lr", type=float, default=4e-5, help="Initial learning rate (default: 4e-5)")
+    parser.add_argument("--min-lr", type=float, default=1e-6, help="Minimum learning rate floor (default: 1e-6)")
+    parser.add_argument(
+        "--scheduler",
+        choices=["cosine", "multistep", "exponential", "plateau"],
+        default="cosine",
+        help="Learning rate scheduler strategy: cosine (recommended), multistep, exponential, or plateau",
+    )
     parser.add_argument("--checkpoint-interval-steps", type=int, default=500)
     parser.add_argument("--eval-interval-steps", type=int, default=500)
     parser.add_argument("--no-amp", action="store_true")
@@ -548,13 +555,22 @@ def main() -> None:
     if distributed.enabled:
         model = DistributedDataParallel(base_model, device_ids=[distributed.local_rank])
 
-    # CompressAI Official Optimizer Settings (Adam with lr=1e-4)
+    # Adam Optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
-    # CompressAI Official MultiStepLR Scheduler (decay at 75% and 90% epochs)
-    step1 = int(args.epochs * 0.75)
-    step2 = int(args.epochs * 0.90)
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[step1, step2], gamma=0.1)
+    # Learning Rate Scheduler Configuration
+    if args.scheduler == "cosine":
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=args.min_lr)
+    elif args.scheduler == "multistep":
+        s1, s2, s3 = int(args.epochs * 0.30), int(args.epochs * 0.60), int(args.epochs * 0.85)
+        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[s1, s2, s3], gamma=0.5)
+    elif args.scheduler == "exponential":
+        gamma = (args.min_lr / args.lr) ** (1.0 / max(1, args.epochs))
+        scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=gamma)
+    elif args.scheduler == "plateau":
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=5, min_lr=args.min_lr)
+    else:
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=args.min_lr)
 
     scaler = torch.amp.GradScaler("cuda", enabled=amp_enabled)
 

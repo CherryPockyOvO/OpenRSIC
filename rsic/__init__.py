@@ -25,6 +25,7 @@ from .models import (
 )
 from .geotiff import extract_geotiff_metadata, inject_geotiff_metadata
 from .utils import (
+    calculate_color_and_reconstruction_metrics,
     crop_to_size,
     image_to_tensor,
     load_checkpoint,
@@ -67,6 +68,7 @@ __all__ = [
     "load_checkpoint",
     "read_remote_sensing_tif",
     "tensor_to_remote_sensing_tif",
+    "calculate_color_and_reconstruction_metrics",
     "extract_geotiff_metadata",
     "inject_geotiff_metadata",
 ]

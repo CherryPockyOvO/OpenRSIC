@@ -2,9 +2,8 @@
 set -e
 
 # ==============================================================================
-# Stage 1: CompressAI Official Highest Quality Standard (Quality 8: lambda=0.1800)
-# Full-Precision Pre-training (RTX 5090 / 4090 / 3090)
-# Target: PSNR > 40 dB, SSIM > 0.98, High Fidelity Remote Sensing Reconstruction
+# OpenRSIC RGB Model Training Script (train_rgb.sh)
+# Optimized LR (4e-5) with CosineAnnealingLR Scheduler
 # ==============================================================================
 
 RESUME_ARG=""
