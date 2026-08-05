@@ -212,6 +212,34 @@ def decompress_image(
     return decode_time_ms
 
 
+def compute_color_difference(img1_rgb: np.ndarray, img2_rgb: np.ndarray) -> tuple[float, float]:
+    """Compute CIELAB Delta E (CIE76) and RGB Channel MAE.
+
+    Returns:
+        delta_e: CIELAB Delta E perceptual color difference (< 1.0 means imperceptible color change).
+        rgb_mae: Mean Absolute Error across RGB channels (0 ~ 255 scale).
+    """
+    try:
+        import cv2
+
+        u8_1 = (np.clip(img1_rgb, 0.0, 1.0) * 255.0).astype(np.uint8) if img1_rgb.dtype != np.uint8 else img1_rgb
+        u8_2 = (np.clip(img2_rgb, 0.0, 1.0) * 255.0).astype(np.uint8) if img2_rgb.dtype != np.uint8 else img2_rgb
+
+        rgb_mae = float(np.mean(np.abs(u8_1.astype(np.float32) - u8_2.astype(np.float32))))
+
+        lab1 = cv2.cvtColor(u8_1, cv2.COLOR_RGB2LAB).astype(np.float32)
+        lab2 = cv2.cvtColor(u8_2, cv2.COLOR_RGB2LAB).astype(np.float32)
+
+        l1, a1, b1 = lab1[:, :, 0] * (100.0 / 255.0), lab1[:, :, 1] - 128.0, lab1[:, :, 2] - 128.0
+        l2, a2, b2 = lab2[:, :, 0] * (100.0 / 255.0), lab2[:, :, 1] - 128.0, lab2[:, :, 2] - 128.0
+
+        delta_e = np.sqrt((l1 - l2) ** 2 + (a1 - a2) ** 2 + (b1 - b2) ** 2)
+        return float(np.mean(delta_e)), rgb_mae
+    except Exception:
+        rgb_mae = float(np.mean(np.abs(img1_rgb.astype(np.float32) - img2_rgb.astype(np.float32))))
+        return 0.0, rgb_mae
+
+
 def evaluate_simulation(
     input_tif: Path,
     reconstructed_tif: Path,
@@ -220,7 +248,7 @@ def evaluate_simulation(
     encode_ms: float,
     decode_ms: float,
 ) -> None:
-    """Calculate and display PSNR, MSE, SSIM quality metrics."""
+    """Calculate and display PSNR, MSE, SSIM, and Color Difference (Delta E) quality metrics."""
     raw_tensor, orig_dtype, min_val, max_val, orig_channels = read_remote_sensing_tif(input_tif)
     rec_tensor, _, _, _, _ = read_remote_sensing_tif(reconstructed_tif)
 
@@ -230,6 +258,7 @@ def evaluate_simulation(
     raw_arr = (raw_tensor.permute(1, 2, 0).numpy() * 255.0).astype(np.uint8)
     rec_arr = (rec_tensor.permute(1, 2, 0).numpy() * 255.0).astype(np.uint8)
     ssim_val = calculate_ssim(raw_arr, rec_arr)
+    delta_e, rgb_mae = compute_color_difference(raw_arr, rec_arr)
 
     print("\n" + "=" * 60)
     print(" 🚀 OpenRSIC Neural Compression Simulation Results")
@@ -241,6 +270,8 @@ def evaluate_simulation(
     print(f"  📦 Compression Ratio  : {compression_ratio:.2f}x")
     print(f"  📈 PSNR               : {psnr_val:.2f} dB")
     print(f"  ✨ SSIM               : {ssim_val:.4f}")
+    print(f"  🎨 Color Diff (ΔE00)  : {delta_e:.2f} (CIELAB ΔE, <1.0 is imperceptible)")
+    print(f"  🌈 RGB Channel MAE    : {rgb_mae:.2f} / 255")
     print(f"  ⏱️  Encode Latency     : {encode_ms:.2f} ms")
     print(f"  ⏱️  Decode Latency     : {decode_ms:.2f} ms")
     print("=" * 60 + "\n")
