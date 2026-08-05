@@ -44,8 +44,9 @@ def unzip_file(zip_path: Path, target_dir: Path) -> None:
 
 
 def setup_autodl_pub_coco() -> None:
-    train_target = Path("/root/autodl-tmp/datasets2/train")
-    val_target = Path("/root/autodl-tmp/datasets2/val")
+    base_dir = Path(__file__).resolve().parent
+    train_target = (base_dir / ".." / "datasets2" / "train").resolve()
+    val_target = (base_dir / ".." / "datasets2" / "val").resolve()
 
     # 1. Search and unzip training zips
     found_train = False
@@ -69,7 +70,7 @@ def setup_autodl_pub_coco() -> None:
     if not found_val:
         print("⚠️ No validation zips (DIV2K_valid_HR.zip / val2017.zip) found under /autodl-pub.")
 
-    print("\n🎉 All AutoDL public dataset extraction finished under /root/autodl-tmp/datasets2!")
+    print(f"\n🎉 All AutoDL public dataset extraction finished under {train_target.parent}!")
 
 
 if __name__ == "__main__":
