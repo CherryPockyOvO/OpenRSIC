@@ -77,7 +77,7 @@ TRAIN_PROFILES = {
         "max_bpp": None,
         "epochs": 200,
         "batch_size": 32,
-        "crop_size": 512,
+        "crop_size": 256,
         "lr": 1e-4,
         "enable_latent_fake_quant": False,
         "enable_z_fake_quant": False,
@@ -91,7 +91,7 @@ TRAIN_PROFILES = {
         "max_bpp": None,
         "epochs": 40,
         "batch_size": 32,
-        "crop_size": 512,
+        "crop_size": 256,
         "lr": 1e-5,
         "enable_latent_fake_quant": True,
         "latent_fake_quant_bits": 8,
@@ -106,16 +106,16 @@ TRAIN_PROFILES = {
         "z_range_weight": 0.01,
     },
     # CompressAI Quality Levels 1 ~ 7 Profiles
-    "compressai_q7_fp": {"model_variant": MODEL_VARIANT_RSIC, "lmbda": COMPRESSAI_LAMBDAS[7], "max_bpp": None, "epochs": 200, "batch_size": 32, "crop_size": 512, "lr": 1e-4},
-    "compressai_q6_fp": {"model_variant": MODEL_VARIANT_RSIC, "lmbda": COMPRESSAI_LAMBDAS[6], "max_bpp": None, "epochs": 200, "batch_size": 32, "crop_size": 512, "lr": 1e-4},
-    "compressai_q5_fp": {"model_variant": MODEL_VARIANT_RSIC, "lmbda": COMPRESSAI_LAMBDAS[5], "max_bpp": None, "epochs": 200, "batch_size": 32, "crop_size": 512, "lr": 1e-4},
-    "compressai_q4_fp": {"model_variant": MODEL_VARIANT_RSIC, "lmbda": COMPRESSAI_LAMBDAS[4], "max_bpp": None, "epochs": 200, "batch_size": 32, "crop_size": 512, "lr": 1e-4},
-    "compressai_q3_fp": {"model_variant": MODEL_VARIANT_RSIC, "lmbda": COMPRESSAI_LAMBDAS[3], "max_bpp": None, "epochs": 200, "batch_size": 32, "crop_size": 512, "lr": 1e-4},
-    "compressai_q2_fp": {"model_variant": MODEL_VARIANT_RSIC, "lmbda": COMPRESSAI_LAMBDAS[2], "max_bpp": None, "epochs": 200, "batch_size": 32, "crop_size": 512, "lr": 1e-4},
-    "compressai_q1_fp": {"model_variant": MODEL_VARIANT_RSIC, "lmbda": COMPRESSAI_LAMBDAS[1], "max_bpp": None, "epochs": 200, "batch_size": 32, "crop_size": 512, "lr": 1e-4},
+    "compressai_q7_fp": {"model_variant": MODEL_VARIANT_RSIC, "lmbda": COMPRESSAI_LAMBDAS[7], "max_bpp": None, "epochs": 200, "batch_size": 32, "crop_size": 256, "lr": 1e-4},
+    "compressai_q6_fp": {"model_variant": MODEL_VARIANT_RSIC, "lmbda": COMPRESSAI_LAMBDAS[6], "max_bpp": None, "epochs": 200, "batch_size": 32, "crop_size": 256, "lr": 1e-4},
+    "compressai_q5_fp": {"model_variant": MODEL_VARIANT_RSIC, "lmbda": COMPRESSAI_LAMBDAS[5], "max_bpp": None, "epochs": 200, "batch_size": 32, "crop_size": 256, "lr": 1e-4},
+    "compressai_q4_fp": {"model_variant": MODEL_VARIANT_RSIC, "lmbda": COMPRESSAI_LAMBDAS[4], "max_bpp": None, "epochs": 200, "batch_size": 32, "crop_size": 256, "lr": 1e-4},
+    "compressai_q3_fp": {"model_variant": MODEL_VARIANT_RSIC, "lmbda": COMPRESSAI_LAMBDAS[3], "max_bpp": None, "epochs": 200, "batch_size": 32, "crop_size": 256, "lr": 1e-4},
+    "compressai_q2_fp": {"model_variant": MODEL_VARIANT_RSIC, "lmbda": COMPRESSAI_LAMBDAS[2], "max_bpp": None, "epochs": 200, "batch_size": 32, "crop_size": 256, "lr": 1e-4},
+    "compressai_q1_fp": {"model_variant": MODEL_VARIANT_RSIC, "lmbda": COMPRESSAI_LAMBDAS[1], "max_bpp": None, "epochs": 200, "batch_size": 32, "crop_size": 256, "lr": 1e-4},
     # Legacy Profiles Compatibility
-    "rsic_fp": {"model_variant": MODEL_VARIANT_RSIC, "lmbda": COMPRESSAI_LAMBDAS[8], "max_bpp": None, "epochs": 200, "batch_size": 32, "crop_size": 512, "lr": 1e-4},
-    "rsic_qat8": {"model_variant": MODEL_VARIANT_RSIC, "lmbda": COMPRESSAI_LAMBDAS[8], "max_bpp": None, "epochs": 40, "batch_size": 32, "crop_size": 512, "lr": 1e-5, "enable_latent_fake_quant": True, "latent_fake_quant_bits": 8, "enable_z_fake_quant": True, "z_fake_quant_bits": 8, "enable_scale_fake_quant": True, "scale_fake_quant_bits": 8, "latent_range_weight": 0.01, "z_range_weight": 0.01},
+    "rsic_fp": {"model_variant": MODEL_VARIANT_RSIC, "lmbda": COMPRESSAI_LAMBDAS[8], "max_bpp": None, "epochs": 200, "batch_size": 32, "crop_size": 256, "lr": 1e-4},
+    "rsic_qat8": {"model_variant": MODEL_VARIANT_RSIC, "lmbda": COMPRESSAI_LAMBDAS[8], "max_bpp": None, "epochs": 40, "batch_size": 32, "crop_size": 256, "lr": 1e-5, "enable_latent_fake_quant": True, "latent_fake_quant_bits": 8, "enable_z_fake_quant": True, "z_fake_quant_bits": 8, "enable_scale_fake_quant": True, "scale_fake_quant_bits": 8, "latent_range_weight": 0.01, "z_range_weight": 0.01},
 }
 
 
@@ -485,7 +485,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--resume", type=Path, default=None)
     parser.add_argument("--epochs", type=int, default=200)
     parser.add_argument("--batch-size", type=int, default=32)
-    parser.add_argument("--crop-size", type=int, default=512)
+    parser.add_argument("--crop-size", type=int, default=256)
     parser.add_argument("--num-workers", type=int, default=8)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--checkpoint-interval-steps", type=int, default=500)
