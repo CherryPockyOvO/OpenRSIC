@@ -25,75 +25,51 @@ def find_public_zip(filename: str) -> Path | None:
     return None
 
 
-def setup_autodl_pub_coco() -> None:
-    train_zip = find_public_zip("train2017.zip")
-    val_zip = find_public_zip("val2017.zip")
+def unzip_file(zip_path: Path, target_dir: Path) -> None:
+    target_dir.mkdir(parents=True, exist_ok=True)
+    print(f"\n📦 Found local public zip: {zip_path}")
+    print(f"🚀 Unzipping into {target_dir}...")
+    subprocess.run(["unzip", "-q", "-o", str(zip_path), "-d", str(target_dir)], check=True)
 
+    # Flatten if unzipped into a subfolder
+    subfolders = [d for d in target_dir.iterdir() if d.is_dir()]
+    for sub in subfolders:
+        if sub.name in ("train2017", "val2017", "DIV2K_train_HR", "DIV2K_valid_HR"):
+            print(f"🚚 Flattening nested directory {sub.name} -> {target_dir}...")
+            for f in sub.iterdir():
+                if f.is_file():
+                    shutil.move(str(f), str(target_dir / f.name))
+            shutil.rmtree(sub)
+    print(f"✅ Extracted {zip_path.name} successfully!")
+
+
+def setup_autodl_pub_coco() -> None:
     train_target = Path("/root/autodl-tmp/datasets2/train")
     val_target = Path("/root/autodl-tmp/datasets2/val")
 
-    train_target.mkdir(parents=True, exist_ok=True)
-    val_target.mkdir(parents=True, exist_ok=True)
+    # 1. Search and unzip training zips
+    found_train = False
+    for train_name in ["DIV2K_train_HR.zip", "train2017.zip"]:
+        z = find_public_zip(train_name)
+        if z:
+            unzip_file(z, train_target)
+            found_train = True
 
-    if train_zip and train_zip.exists():
-        print(f"📦 Found local public zip: {train_zip}")
-        print(f"🚀 Unzipping training images into {train_target}...")
-        subprocess.run(["unzip", "-q", "-o", str(train_zip), "-d", str(train_target)], check=True)
+    if not found_train:
+        print("⚠️ No training zips (DIV2K_train_HR.zip / train2017.zip) found under /autodl-pub.")
 
-        nested_train = train_target / "train2017"
-        if nested_train.exists() and nested_train.is_dir():
-            print(f"🚚 Flattening nested directory {nested_train.name} -> {train_target}...")
-            for f in nested_train.iterdir():
-                if f.is_file():
-                    shutil.move(str(f), str(train_target / f.name))
-            shutil.rmtree(nested_train)
-        print("✅ Training dataset unzipped and ready!")
-    else:
-        print(f"⚠️ train2017.zip not found in candidate public directories.")
+    # 2. Search and unzip validation zips
+    found_val = False
+    for val_name in ["DIV2K_valid_HR.zip", "val2017.zip"]:
+        z = find_public_zip(val_name)
+        if z:
+            unzip_file(z, val_target)
+            found_val = True
 
-    # Check for DIV2K HighResolution directory
-    div2k_roots = [
-        Path("/autodl-pub/DIV2K/HighResolution"),
-        Path("/root/autodl-pub/DIV2K/HighResolution"),
-        Path("/autodl-pub/DIV2K"),
-        Path("/root/autodl-pub/DIV2K"),
-    ]
-    div2k_found = False
-    for div2k_path in div2k_roots:
-        if div2k_path.exists():
-            print(f"\n📦 Found DIV2K public dataset at: {div2k_path}")
-            linked = 0
-            for img_file in div2k_path.rglob("*"):
-                if img_file.is_file() and img_file.suffix.lower() in {".png", ".jpg", ".jpeg"}:
-                    target_link = train_target / f"div2k_{img_file.name}"
-                    if not target_link.exists() and not target_link.is_symlink():
-                        try:
-                            target_link.symlink_to(img_file)
-                            linked += 1
-                        except Exception:
-                            pass
-            if linked > 0:
-                print(f"✅ Created {linked} symlinks from DIV2K into {train_target}!")
-                div2k_found = True
-                break
+    if not found_val:
+        print("⚠️ No validation zips (DIV2K_valid_HR.zip / val2017.zip) found under /autodl-pub.")
 
-    if val_zip and val_zip.exists():
-        print(f"\n📦 Found local public zip: {val_zip}")
-        print(f"🚀 Unzipping validation images into {val_target}...")
-        subprocess.run(["unzip", "-q", "-o", str(val_zip), "-d", str(val_target)], check=True)
-
-        nested_val = val_target / "val2017"
-        if nested_val.exists() and nested_val.is_dir():
-            print(f"🚚 Flattening nested directory {nested_val.name} -> {val_target}...")
-            for f in nested_val.iterdir():
-                if f.is_file():
-                    shutil.move(str(f), str(val_target / f.name))
-            shutil.rmtree(nested_val)
-        print("✅ Validation dataset unzipped and ready!")
-    else:
-        print(f"⚠️ val2017.zip not found in candidate public directories.")
-
-    print("\n🎉 All AutoDL public datasets check finished under /root/autodl-tmp/datasets2!")
+    print("\n🎉 All AutoDL public dataset extraction finished under /root/autodl-tmp/datasets2!")
 
 
 if __name__ == "__main__":
