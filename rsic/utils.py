@@ -122,7 +122,7 @@ def tensor_to_remote_sensing_tif(
 ) -> np.ndarray:
     """Restore a 32-bit float PyTorch Tensor [3, H, W] back to its native bit-depth (uint8, uint16, float32)
 
-    and write directly to a .tif / .tiff file.
+    and write directly to a file.
     """
     arr_f32 = tensor.detach().cpu().clamp(0.0, 1.0).permute(1, 2, 0).numpy()
     dtype_str = str(orig_dtype)
@@ -138,14 +138,19 @@ def tensor_to_remote_sensing_tif(
         out = out[:, :, 0]
 
     save_str = str(save_path)
-    if out.ndim == 3 and out.shape[2] == 3:
-        Image.fromarray(out.astype(np.uint8) if out.dtype != np.uint8 else out).save(save_str)
+    if "uint8" in dtype_str:
+        Image.fromarray(out).save(save_str)
     else:
         try:
             import cv2
-            cv2.imwrite(save_str, out)
+
+            bgr = cv2.cvtColor(out, cv2.COLOR_RGB2BGR) if (out.ndim == 3 and out.shape[2] == 3) else out
+            cv2.imwrite(save_str, bgr)
         except Exception:
-            Image.fromarray(out).save(save_str)
+            img_u8 = (arr_f32 * 255.0).round().astype(np.uint8)
+            if orig_channels == 1 and img_u8.ndim == 3:
+                img_u8 = img_u8[:, :, 0]
+            Image.fromarray(img_u8).save(save_str)
     return out
 
 
