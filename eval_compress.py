@@ -255,10 +255,15 @@ def evaluate_simulation(
     mse_val = float(F.mse_loss(rec_tensor, raw_tensor).item())
     psnr_val = 99.99 if mse_val <= 1e-10 else float(10.0 * math.log10(1.0 / mse_val))
 
+    # Compute native scale MAE error for 32-bit float / 16-bit uint
+    native_mae = float(torch.mean(torch.abs(rec_tensor - raw_tensor)).item()) * (max_val - min_val if max_val > min_val else 1.0)
+
     raw_arr = (raw_tensor.permute(1, 2, 0).numpy() * 255.0).astype(np.uint8)
     rec_arr = (rec_tensor.permute(1, 2, 0).numpy() * 255.0).astype(np.uint8)
     ssim_val = calculate_ssim(raw_arr, rec_arr)
     delta_e, rgb_mae = compute_color_difference(raw_arr, rec_arr)
+
+    dtype_str = str(orig_dtype)
 
     print("\n" + "=" * 60)
     print(" 🚀 OpenRSIC Neural Compression Simulation Results")
@@ -266,12 +271,15 @@ def evaluate_simulation(
     print(f"  📄 Input Image        : {input_tif}")
     print(f"  💾 Bitstream Output    : {reconstructed_tif.with_suffix('.rsic')}")
     print(f"  🖼️  Reconstructed TIF  : {reconstructed_tif}")
+    print(f"  💎 Native Bit-Depth   : {dtype_str} ({'32-bit float' if 'float' in dtype_str else '16-bit' if 'uint16' in dtype_str else '8-bit'})")
     print(f"  📊 Bitrate (BPP)      : {bpp:.4f} bpp")
     print(f"  📦 Compression Ratio  : {compression_ratio:.2f}x")
     print(f"  📈 PSNR               : {psnr_val:.2f} dB")
     print(f"  ✨ SSIM               : {ssim_val:.4f}")
     print(f"  🎨 Color Diff (ΔE00)  : {delta_e:.2f} (CIELAB ΔE, <1.0 is imperceptible)")
     print(f"  🌈 RGB Channel MAE    : {rgb_mae:.2f} / 255")
+    if "float" in dtype_str or "uint16" in dtype_str:
+        print(f"  🔬 Native Scale MAE   : {native_mae:.6f} (原生 32/16 位像素绝对误差)")
     print(f"  ⏱️  Encode Latency     : {encode_ms:.2f} ms")
     print(f"  ⏱️  Decode Latency     : {decode_ms:.2f} ms")
     print("=" * 60 + "\n")
