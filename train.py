@@ -548,13 +548,9 @@ def main() -> None:
     if distributed.enabled:
         model = DistributedDataParallel(base_model, device_ids=[distributed.local_rank])
 
-    # CompressAI Official Optimizer Settings (Adam with lr=1e-4)
+    # CosineAnnealingLR with strict eta_min=1e-5 floor
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-
-    # Smoother MultiStepLR Scheduler (gamma=0.3 to maintain active convergence without freezing at 1e-6)
-    step1 = int(args.epochs * 0.75)
-    step2 = int(args.epochs * 0.90)
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[step1, step2], gamma=0.3)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-5)
 
     scaler = torch.amp.GradScaler("cuda", enabled=amp_enabled)
 
@@ -567,15 +563,13 @@ def main() -> None:
         state = load_checkpoint(args.resume, base_model, optimizer, scheduler, scaler)
         start_epoch, global_step = state.epoch, state.global_step
         current_lr = optimizer.param_groups[0]["lr"]
-        if current_lr <= 2e-6:
-            target_lr = 4.5e-5
+        if current_lr < 1e-5:
+            target_lr = max(1e-5, getattr(args, "lr", 1e-4))
             for param_group in optimizer.param_groups:
                 param_group["lr"] = target_lr
-            step1 = int(args.epochs * 0.75)
-            step2 = int(args.epochs * 0.90)
-            scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[step1, step2], gamma=0.3)
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-5)
             if distributed.is_main:
-                print(f"🔄 Restored LR was exhausted ({current_lr:.1e}). Automatically reset LR to active rate: {target_lr:.1e}")
+                print(f"🔄 Restored LR was too small ({current_lr:.1e}). Resetting LR floor to active rate: {target_lr:.1e} (eta_min=1e-5)")
         if distributed.is_main:
             print(f"Resumed training from {args.resume} (epoch {start_epoch}, step {global_step})")
 
@@ -618,6 +612,9 @@ def main() -> None:
                 save_step_cb=save_step_checkpoint, distributed=distributed,
             )
             scheduler.step()
+            for param_group in optimizer.param_groups:
+                if param_group["lr"] < 1e-5:
+                    param_group["lr"] = 1e-5
             if stop:
                 break
     finally:
