@@ -23,6 +23,9 @@ def load_remote_sensing_image(path: str | Path) -> Image.Image:
             return img.convert("RGB")
         arr = np.array(img)
     except Exception:
+        arr = None
+
+    if arr is None:
         try:
             import cv2
 
@@ -69,6 +72,15 @@ def read_remote_sensing_tif(path: str | Path) -> tuple[torch.Tensor, np.dtype, f
     path_str = str(path)
     used_cv2 = False
     try:
+        img = Image.open(path_str)
+        if img.mode in ("RGB", "L", "RGBA"):
+            arr = np.array(img.convert("RGB"))
+        else:
+            arr = np.array(img)
+    except Exception:
+        arr = None
+
+    if arr is None:
         import cv2
 
         arr = cv2.imread(path_str, cv2.IMREAD_UNCHANGED)
@@ -81,8 +93,7 @@ def read_remote_sensing_tif(path: str | Path) -> tuple[torch.Tensor, np.dtype, f
         arr = None
 
     if arr is None:
-        img = Image.open(path_str)
-        arr = np.array(img)
+        raise FileNotFoundError(f"Could not load image at: {path_str}")
 
     orig_dtype = arr.dtype
     orig_channels = 1 if arr.ndim == 2 or (arr.ndim == 3 and arr.shape[2] == 1) else 3
@@ -92,10 +103,16 @@ def read_remote_sensing_tif(path: str | Path) -> tuple[torch.Tensor, np.dtype, f
 
     if orig_dtype == np.uint8:
         norm = arr_f32 / 255.0
+    elif max_val <= 1.0 and min_val >= 0.0:
+        norm = arr_f32
+    elif max_val <= 255.0:
+        norm = arr_f32 / 255.0
     elif orig_dtype == np.uint16:
         norm = arr_f32 / 65535.0
+    elif max_val > min_val:
+        norm = (arr_f32 - min_val) / (max_val - min_val + 1e-7)
     else:
-        norm = (arr_f32 - min_val) / (max_val - min_val + 1e-7) if max_val > min_val else np.zeros_like(arr_f32)
+        norm = np.zeros_like(arr_f32)
 
     if norm.ndim == 2:
         norm = np.stack([norm] * 3, axis=-1)
@@ -119,13 +136,17 @@ def tensor_to_remote_sensing_tif(
 ) -> np.ndarray:
     """Restore a 32-bit float PyTorch Tensor [3, H, W] back to its native bit-depth (uint8, uint16, float32)
 
-    and write directly to a .tif / .tiff file.
+    and write directly to a file.
     """
     arr_f32 = tensor.detach().cpu().clamp(0.0, 1.0).permute(1, 2, 0).numpy()
     dtype_str = str(orig_dtype)
 
     if "uint8" in dtype_str:
         out = (arr_f32 * 255.0).round().astype(np.uint8)
+    elif max_val <= 1.0 and min_val >= 0.0:
+        out = arr_f32.astype(orig_dtype)
+    elif max_val <= 255.0:
+        out = (arr_f32 * 255.0).astype(orig_dtype)
     elif "uint16" in dtype_str:
         out = (arr_f32 * 65535.0).round().astype(np.uint16)
     else:
@@ -135,8 +156,11 @@ def tensor_to_remote_sensing_tif(
         out = out[:, :, 0]
 
     save_str = str(save_path)
-    try:
-        import cv2
+    if "uint8" in dtype_str:
+        Image.fromarray(out).save(save_str)
+    else:
+        try:
+            import cv2
 
         bgr_out = out.copy()
         if bgr_out.ndim == 3 and bgr_out.shape[2] >= 3:

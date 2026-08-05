@@ -91,7 +91,7 @@ TRAIN_PROFILES = {
         "max_bpp": None,
         "epochs": 40,
         "batch_size": 32,
-        "crop_size": 512,
+        "crop_size": 256,
         "lr": 1e-5,
         "enable_latent_fake_quant": True,
         "latent_fake_quant_bits": 8,
@@ -485,7 +485,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--resume", type=Path, default=None)
     parser.add_argument("--epochs", type=int, default=200)
     parser.add_argument("--batch-size", type=int, default=32)
-    parser.add_argument("--crop-size", type=int, default=512)
+    parser.add_argument("--crop-size", type=int, default=256)
     parser.add_argument("--num-workers", type=int, default=8)
     parser.add_argument("--lr", type=float, default=4e-5, help="Initial learning rate (default: 4e-5)")
     parser.add_argument("--min-lr", type=float, default=1e-6, help="Minimum learning rate floor (default: 1e-6)")
@@ -524,12 +524,20 @@ def main() -> None:
         sampler=train_sampler,
         num_workers=args.num_workers,
         pin_memory=True,
+        persistent_workers=(args.num_workers > 0),
     )
 
     val_loader = None
     if args.val_dir and args.val_dir.exists():
         val_dataset = ImageFolderDataset(args.val_dir, transform=make_eval_transform(args.crop_size))
-        val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
+        val_loader = DataLoader(
+            val_dataset,
+            batch_size=args.batch_size,
+            shuffle=False,
+            num_workers=args.num_workers,
+            pin_memory=True,
+            persistent_workers=(args.num_workers > 0),
+        )
 
     # QAT Settings & Model
     qat = QATSettings(
@@ -582,6 +590,14 @@ def main() -> None:
     elif args.resume:
         state = load_checkpoint(args.resume, base_model, optimizer, scheduler, scaler)
         start_epoch, global_step = state.epoch, state.global_step
+        current_lr = optimizer.param_groups[0]["lr"]
+        if current_lr < 1e-5:
+            target_lr = max(1e-5, getattr(args, "lr", 1e-4))
+            for param_group in optimizer.param_groups:
+                param_group["lr"] = target_lr
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-5)
+            if distributed.is_main:
+                print(f"🔄 Restored LR was too small ({current_lr:.1e}). Resetting LR floor to active rate: {target_lr:.1e} (eta_min=1e-5)")
         if distributed.is_main:
             print(f"Resumed training from {args.resume} (epoch {start_epoch}, step {global_step})")
 
@@ -624,6 +640,9 @@ def main() -> None:
                 save_step_cb=save_step_checkpoint, distributed=distributed,
             )
             scheduler.step()
+            for param_group in optimizer.param_groups:
+                if param_group["lr"] < 1e-5:
+                    param_group["lr"] = 1e-5
             if stop:
                 break
     finally:
